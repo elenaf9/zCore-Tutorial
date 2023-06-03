@@ -1,18 +1,18 @@
-# 简明 zCore 教程
+## Concise zCore Tutorials
 
-## 自己动手山寨操作系统：自顶向下方法
+## Do-it-yourself OS torrents: a top-down approach
 
-zCore 是用 Rust 语言重写的 Zircon 微内核，它是 Google 正在开发的 Fuchsia OS 中的底层内核。
+zCore is a rewrite of the Zircon microkernel in Rust, the underlying kernel in the Fuchsia OS being developed by Google.
 
-本教程基于 zCore 的真实开发历史，还原其开发过程。带领读者一步一步用 Rust 实现自己的 Zircon 内核，最终能够运行原生的 shell 程序。
-在此过程中我们将体会 Zircon 微内核的设计理念，感受如何用 Rust 语言以一种现代的方式编写系统软件，在项目中实现理论与实践的融合。
+This tutorial recreates the development process of zCore based on its real-life development history. It takes the reader step by step through the implementation of your own Zircon kernel in Rust, which will eventually be able to run native shell programs.
+In the process, we will experience the design philosophy of the Zircon microkernel, how to write system software in a modern way using the Rust language, and how to integrate theory and practice in a project.
 
-与传统操作系统开发不同的是，zCore 使用一种自顶向下的方法：首先基于宿主系统已有的功能，在用户态实现一个能够工作的 libOS，然后再逐步替换底层实现，
-"移植"回裸机环境中运行。因此我们更关注系统的整体设计，从高层视角看待 OS 如何为用户提供服务，而不纠结于底层硬件细节。
+Unlike traditional OS development, zCore uses a top-down approach: first implement a working libOS in the user state based on the existing functionality of the host system, and then gradually replace the underlying implementation to "port" back to bare metal.
+Then the underlying implementation is gradually replaced and "ported" back to a bare metal environment. Therefore, we focus on the overall design of the system, taking a high-level view of how the OS provides services to the user, rather than getting hung up on the underlying hardware details.
 
-鉴于此，本教程假设读者了解操作系统基本概念和原理，具有常用的 Linux 系统使用经验，并且会使用 Rust 语言编写简单程序。
-如果读者不熟悉操作系统和 Rust 语言，希望以自底向上方法从零构建操作系统，[rCore Tutorial] 可能是更好的选择。
+For this reason, this tutorial assumes that the reader understands basic OS concepts and principles, has experience with common Linux systems, and can write simple programs using the Rust language.
+If the reader is not familiar with the OS and Rust language and wants to build an OS from scratch with a bottom-up approach, [rCore Tutorial] may be a better choice.
 
-如果你准备好了，让我们开始吧！
+If you're ready, let's get started!
 
 [rCore Tutorial]: https://rcore-os.github.io/rCore-Tutorial-deploy/

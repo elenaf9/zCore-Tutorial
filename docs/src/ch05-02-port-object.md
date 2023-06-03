@@ -1,13 +1,13 @@
-# 同时等待多个信号：Port 对象
+## Waiting for multiple signals at the same time: the Port object
 
-## Port 对象简介
+## Introduction to the Port object
 
-> 同时提及一下 Linux 的 epoll 机制作为对比
+> Also mention the Linux epoll mechanism for comparison
 
-## 实现 Port 对象框架
+## Implementing the Port object framework
 
-> 定义 Port 和 PortPacket 结构体
+## Define Port and PortPacket structs
 
-## 实现事件推送和等待
+## Implementing event pushing and waiting
 
-> 实现 KernelObject::send_signal_to_port 和 Port::wait 函数，并做单元测试
+> Implement KernelObject::send_signal_to_port and Port::wait functions, and do unit tests

@@ -1,22 +1,22 @@
 # zCore Tutorial
 
-[![CI](https://github.com/rcore-os/zCore-Tutorial/workflows/CI/badge.svg?branch=master)](https://github.com/rcore-os/zCore-Tutorial/actions)
-[![Docs](https://img.shields.io/badge/docs-alpha-blue)](https://rcore-os.github.io/zCore-Tutorial/)
+[! [CI](https://github.com/rcore-os/zCore-Tutorial/workflows/CI/badge.svg?branch=master)](https://github.com/rcore-os/zCore-Tutorial/ actions)
+[! [Docs](https://img.shields.io/badge/docs-alpha-blue)](https://rcore-os.github.io/zCore-Tutorial/)
 
-zCore Toturial 的目标是通过`step by step`地建立一个简化的zCore kernel的过程来学习和掌握zCore Kernel的核心概念和对应实现，从而为进一步分析掌握zCore的完整内核打下基础。
+The goal of zCore Toturial is to learn and master the core concepts and corresponding implementations of the zCore Kernel by `step by step` building a simplified zCore kernel, thus laying the foundation for further analysis and mastery of the complete zCore kernel.
 
-zCore Toturial 的特点是所有的code都在用户态运行，便于调试和分析。
+The zCore Toturial features all code running in the user state, making it easy to debug and analyze.
 
-## 仓库目录
+## repository directory
 
-* `docs/`: 教学实验指导
-* `code`: 操作系统代码
+* `docs/`: teaching lab guide
+* `code`: operating system code
 
-## 实验指导
+## Experimental guide
 
-基于 mdBook，目前目前已经部署到了 [GitHub Pages](https://rcore-os.github.io/zCore-Tutorial/) 上面。
+Based on mdBook, currently deployed on [GitHub Pages](https://rcore-os.github.io/zCore-Tutorial/) at the moment.
 
-### 文档本地使用方法
+### Documentation for local use
 
 ```bash
 git clone https://github.com/rcore-os/zCore-Tutorial.git
@@ -26,61 +26,61 @@ mdbook serve docs
 ```
 
 ## code
-`code`目录下的`rust-toolchain`内容为`nightly-2021-07-27`。原则上，我们会采用`rustc`最新的版本。目前的版本信息如下：
+The contents of `rust-toolchain` in the `code` directory is `nightly-2021-07-27`. In principle, we will use the latest version of `rustc`. The current version information is as follows:
 ```
 rustc 1.56.0-nightly (08095fc1f 2021-07-26)
 ```
 
-## 学习顺序建议
+## Suggested learning sequence
 
-### 初步了解
+### Preliminary understanding
 
-1. 阅读有关fuchsia/zircon的概述/简介文章，如 https://zh.wikipedia.org/zh-hans/Google_Fuchsia
+1. read overview/introduction articles about fuchsia/zircon, e.g. https://zh.wikipedia.org/zh-hans/Google_Fuchsia
 
-2. 阅读 https://fuchsia.dev/fuchsia-src/concepts/kernel 了解zircon基本思想
+2. read https://fuchsia.dev/fuchsia-src/concepts/kernel for basic zircon ideas
 
-3. 阅读潘庆霖毕设论文前两章，了解zCore的基本思想
+3. read the first two chapters of Qinglin Pan's thesis to understand the basic ideas of zCore
 
-### 逐渐深入
-1. 阅读 https://fuchsia.dev/fuchsia-src/reference/syscalls 了解应用程序对Kernel的需求
-2. 阅读 https://fuchsia.dev/fuchsia-src/reference/kernel_objects/objects 了解Kernel中各种object的含义和行为
+### Getting deeper
+1. Read https://fuchsia.dev/fuchsia-src/reference/syscalls to understand the application requirements for Kernel
+2. read https://fuchsia.dev/fuchsia-src/reference/kernel_objects/objects to understand the meaning and behavior of various objects in Kernel
 
-### 理解设计实现
+### Understand the design implementation
 
-1. 阅读&分析本项目中的文档和代码，并对照上面的kernel概念，了解kernel概念和设计实现的对应关系
+1. read & analyze the documentation and code in this project, and compare the kernel concepts above to understand the correspondence between kernel concepts and design implementation
 
-### 动手实践
+### Hands-on practice
 
-1. 在分析和理解的基础上，改进本项目对应章节的文档
+1. improve the documentation of the corresponding section of the project based on the analysis and understanding
 
-2. 在分析和理解的基础上，改进/优化本项目的代码，增加测试用例，增加功能
+2. based on the analysis and understanding, improve/optimize the code of this project, add test cases, and increase the functionality
 
-3. 在大致掌握本项目后，通过进一步理解和改进zCore，对zCore等新型操作系统有很好的感悟，提升自身实践能力
+3. After mastering the project in general, have a good understanding of new operating systems such as zCore by further understanding and improving zCore, and improve your practical skills
 
    
 
-####  code/ch04-xx的相关提示
-  - 推荐运行方式: 在 `ch04-0x` 目录下： `RUST_LOG=info cargo run -p zircon-loader -- /prebuilt/zircon/x64`
-  - ch4 会执行 zircon prebuilt 中的 userboot 程序，详见[userboot源码](https://github.com/vsrinivas/fuchsia/tree/master/zircon/kernel/lib/userabi/userboot)，[fuchsia启动流程](https://fuchsia.dev/fuchsia-src/concepts/booting/userboot?hl=en)。
-  - `ch04-01` 并未实现任何 syscall。因此进入 userboot 后会在第一次 syscall 返回到内核态时 panic 退出。 
-  - `ch04-03` 实现了与 `channel` 和 `debuglog` 有关的部分 syscall，会执行 3 次 syscall 之后由于不支持 process_exit 而退出。
+Tips related to #### code/ch04-xx
+  - Recommended way to run: In the `ch04-0x` directory: `RUST_LOG=info cargo run -p zircon-loader -- /prebuilt/zircon/x64`
+  - ch4 will execute the userboot program in zircon prebuilt, see [userboot source code](https://github.com/vsrinivas/fuchsia/tree/master/zircon/kernel/lib/userabi/ userboot), [fuchsia boot process](https://fuchsia.dev/fuchsia-src/concepts/booting/userboot?hl=en).
+  - `ch04-01` does not implement any syscall, so entering userboot will panic when the first syscall returns to the kernel state. 
+  - `ch04-03` implements some syscalls related to `channel` and `debuglog`, and will execute 3 syscalls and then exit because process_exit is not supported.
 
 
 
-## 参考
+## Reference
 
 - https://fuchsia.dev/
   - https://fuchsia.dev/fuchsia-src/concepts/kernel
   - https://fuchsia.dev/fuchsia-src/reference/kernel_objects/objects
   - https://fuchsia.dev/fuchsia-src/reference/syscalls
   - https://github.com/zhangpf/fuchsia-docs-zh-CN/tree/master/zircon
-  - [许中兴博士演讲：Fuchsia OS 简介](https://xuzhongxing.github.io/201806fuchsia.pdf)
+  - [Presentation by Dr. Zhongxing Xu: Introduction to Fuchsia OS](https://xuzhongxing.github.io/201806fuchsia.pdf)
   
-- 毕设论文
-  - [Rust语言操作系统的设计与实现,王润基本科毕设论文,2019](https://github.com/rcore-os/zCore/wiki/files/wrj-thesis.pdf) 
-  - [zCore操作系统内核的设计与实现,潘庆霖本科毕设论文,2020](https://github.com/rcore-os/zCore/wiki/files/pql-thesis.pdf)
+- Thesis
+  - [Design and Implementation of Rust Language Operating System,王润基 B.S. Thesis,2019](https://github.com/rcore-os/zCore/wiki/files/wrj-thesis.pdf) 
+  - [Design and implementation of zCore OS kernel,Pan Qinglin's undergraduate thesis,2020](https://github.com/rcore-os/zCore/wiki/files/pql-thesis.pdf)
   
-- 开发文档
+- Development Document
   - https://github.com/rcore-os/zCore/wiki/documents-of-zcore
 
-- 更简单和基础的[rCore-Tutorial v3](https://rcore-os.github.io/rCore-Tutorial-Book-v3/)：如果看不懂上面的内容，可以先看看这个教程。
+- The simpler and more basic [rCore-Tutorial v3](https://rcore-os.github.io/rCore-Tutorial-Book-v3/): if you can't read the above, you can read this tutorial first.

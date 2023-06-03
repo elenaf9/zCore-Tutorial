@@ -1,11 +1,11 @@
-# 实现更多：EventPair, Timer 对象
+# Implement more: EventPair, Timer objects
 
-## Event 对象
+## Event objects
 
-## EventPair 对象
+## EventPair object
 
-## HAL：定时器
+## HAL: Timer
 
-> 实现 timer_now, timer_set，在此基础上实现 SleepFuture
+## Implement timer_now, timer_set, and sleepFuture on top of that
 
-## Timer 对象
+## Timer object

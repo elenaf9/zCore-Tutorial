@@ -1,14 +1,14 @@
-# 任务管理
+# Task management
 
-本章我们来实现第一类内核对象：任务管理（Tasks）。
+In this chapter we will implement the first type of kernel object: Tasks.
 
-任务对象主要包括：线程 `Thread`，进程 `Process`，作业 `Job`。以及一些辅助性的对象，例如负责暂停任务执行的 `SuspendToken` 和负责处理异常的 `Exception`。
+Task objects include: Threads `Thread`, Processes `Process`, Jobs `Jobs`. and some auxiliary objects, such as `SuspendToken`, which is responsible for suspending the execution of a task, and `Exception`, which is responsible for handling exceptions.
 
-为了能够真实表现线程对象的行为，我们使用 Rust async 运行时 [`async_std`] 中的**用户态协程**来模拟**内核线程**。
-这样就可以在用户态的单元测试中检验实现的正确性。
-考虑到未来这个 OS 会跑在裸机环境中，将会有不同的内核线程的实现，我们创建一个特殊的**硬件抽象层（Hardware Abstraction Layer，HAL）**，来屏蔽底层平台的差异，对上提供一个统一的接口。
-这个 HAL 的接口未来会根据需要进行扩充。
+In order to be able to realistically represent the behavior of thread objects, we use **user-state concurrent threads** in the Rust async runtime [`async_std`] to emulate **kernel threads**.
+This allows the correctness of the implementation to be verified in a user-state unit test.
+Considering that the OS will run in a bare metal environment in the future and will have different implementations of kernel threads, we create a special **Hardware Abstraction Layer (HAL)** to shield the underlying platform differences and provide a unified interface to the top.
+This HAL interface will be expanded as needed in the future.
 
-本章中我们只会实现运行一个程序所必需的最小功能子集，剩下的部分则留到跑起用户程序之后再按需实现。
+In this chapter, we will only implement the minimum subset of functionality necessary to run a program, leaving the rest to be implemented on demand once the user program is up and running.
 
 [`async_std`]: https://docs.rs/async-std/1.6.2/async_std/index.html

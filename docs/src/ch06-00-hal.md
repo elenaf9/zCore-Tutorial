@@ -1,1 +1,1 @@
-# 硬件抽象层
+# Hardware abstraction layer

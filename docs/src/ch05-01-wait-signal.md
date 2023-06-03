@@ -1,17 +1,17 @@
-# 等待内核对象的信号
+# Waiting for signals from kernel objects
 
-## 信号与等待机制简介
+## Introduction to Signaling and Waiting Mechanisms
 
-## 在内核对象中加入信号
+## Adding signals to kernel objects
 
-> 定义 Signal 结构体
+> Define Signal structs
 >
-> 在 KObjectBase 中加入 signal 和 callbacks 变量，实现 signal 系列函数，并做单元测试
+> Add signal and callbacks variables to KObjectBase, implement signal family of functions, and do unit tests
 
-## 实现信号等待 Future
+## Implement signal wait Future
 
-> 实现 wait_signal 函数，并做单元测试
+> Implement the wait_signal function and do unit tests
 
-## 利用 select 组合子实现多对象等待
+## Use select combinator to implement multi-object wait
 
-> 实现 wait_signal_many 函数，并做单元测试
+> implement wait_signal_many function and do unit tests

@@ -1,102 +1,101 @@
-#  初识内核对象
+# Introduction to kernel objects
 
-## 内核对象简介
+## Introduction to kernel objects
 
-在动手编写我们的代码之前，需要首先进行调研和学习，对目标对象有一个全面系统的了解。
-而了解一个项目设计的最好方式就是阅读官方提供的手册和文档。
+Before we can write our code, we need to do research and study first to get a comprehensive and systematic understanding of the target objects.
+The best way to understand the design of a project is to read the official manuals and documentation provided.
 
-让我们先来阅读一下 Fuchsia 官方文档：[内核对象]。这个链接是社区翻译的中文版，已经有些年头了。如果读者能够科学上网，推荐直接阅读[官方英文版]。
+Let's start by reading the official Fuchsia documentation: [Kernel Objects]. This link is to the community-translated Chinese version, which is a bit old. If the reader has scientific access to the Internet, we recommend reading the [official English version] directly.
 
-[内核对象]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/objects.md
-[官方英文版]: https://fuchsia.dev/fuchsia-src/reference/kernel_objects/objects
+[Kernel objects]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/objects.md
+[Official English version]: https://fuchsia.dev/fuchsia-src/reference/kernel_objects/objects
 
-通过阅读文档，我们了解到与内核对象相关的三个重要概念：**对象（Object），句柄（Handle），权限（Rights）**。它们在 Zircon 内核中的角色和关系如下图所示：
+By reading the documentation, we learn about three important concepts related to kernel objects: **Object, Handle, and Rights**. Their roles and relationships in the Zircon kernel are shown in the following diagram:
 
-![](img/ch01-01-kernel-object.png)
+! [](img/ch01-01-kernel-object.png)
 
-这三个重要概念的定义如下：
+These three important concepts are defined as follows:
 
-- **对象（Object）**： 具备属性和行为的客体。客体之间可有各种联系。从简单的**整数**到复杂的**操作系统进程**等都可看做对象，它不仅仅表示具体的事物，还能表示抽象的规则、计划或事件。
-- **句柄（Handle）**：标识对象的符号，也可看成是一种指向对象的变量（也可称为标识符、引用、ID等）。
-- **权限（Rights）**：是指对象的访问者被允许在对象上执行的操作，即对象的访问权限。当对象访问者打开对象的句柄，该句柄具有对其对象的访问权限的某种组合。
+- **Object**: An object that has properties and behaviors. Objects can be associated with each other in various ways. From simple **integers** to complex **operating system processes**, they can be considered as objects, which can represent not only concrete things, but also abstract rules, plans or events.
+- **Handle (Handle)**: a symbol that identifies an object, which can also be seen as a variable that points to an object (also known as an identifier, reference, ID, etc.).
+- **Permissions (Rights)**: are the operations that the object's visitor is allowed to perform on the object, i.e., the object's access rights. When an object visitor opens a handle to an object, that handle has some combination of access rights to its object.
 
-对于Zircon与对象、句柄、权限的关系，可简单地表述为：
+The relationship between Zircon and objects, handles, and permissions can be expressed simply as follows
 
-* Zircon是一个基于对象的内核，内核资源被抽象封装在不同的 **对象** 中。
-* 用户程序通过 **句柄** 与内核交互。句柄是对某一对象的引用，并且附加了特定的 **权限**。
-* 对象通过 **引用计数** 管理生命周期。对于大多数对象，当指向它的最后一个句柄关闭时，对象随之销毁，或[进入无法挽回的最终状态](https://fuchsia.dev/fuchsia-src/concepts/kernel/concepts#handles_and_rights )。
+* Zircon is an object-based kernel, where kernel resources are abstractly encapsulated in different **objects**.
+* User programs interact with the kernel through **handles**. A handle is a reference to an object with specific **permissions** attached to it.
+* Objects manage their life cycle through **reference counting**. For most objects, when the last handle pointing to it is closed, the object is then destroyed, or [enters an irretrievable final state](https://fuchsia.dev/fuchsia-src/concepts/kernel/concepts#handles_and_rights ).
 
-此外在内核对象的文档中，还列举了一些[常用对象]。点击链接进去就能查看到这个对象的[具体描述]，在页面最下方还列举了与这个对象相关的[全部系统调用]。
-进一步查看系统调用的 [API 定义]，以及它的[行为描述]，我们就能更深入地了解用户程序操作内核对象的一些细节：
+Also in the documentation for kernel objects, there is a list of some [common objects]. Click on the link to see the [specific description] of this object, and at the bottom of the page there is a list of [all system calls] related to this object.
+Looking further into the [API Definition] of the system call, and its [Behavior Description], we can go into more detail about how the user program operates the kernel object:
 
-[常用对象]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/objects.md#应用程序可用的内核对象
-[具体描述]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/objects/channel.md
-[全部系统调用]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/objects/channel.md#系统调用
-[API 定义]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/syscalls/channel_read.md#概要
-[行为描述]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/syscalls/channel_read.md#描述
+[common object]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/objects.md#应用程序可用的内核对象
+[specific description]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/objects/channel.md
+[All system calls]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/objects/channel.md#系统调用
+[API Definition]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/syscalls/channel_read.md#概要
+[Description of behavior]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/syscalls/channel_read.md#描述
 
-* 创建：每一种内核对象都存在一个系统调用来创建它，例如 [`zx_channel_create`]。
-创建对象时一般需要传入一个参数选项 `options`，若创建成功则内核会将一个新句柄写入用户指定的内存中。
+* Create: A system call exists for each type of kernel object to create it, e.g. [`zx_channel_create`].
+The object is usually created by passing a parameter option `options`, and if the creation is successful, the kernel writes a new handle to the user-specified memory.
 
-* 使用：获得对象句柄后可以通过若干系统调用对它进行操作，例如 [`zx_channel_write`]。
-这类系统调用一般需要传入句柄 `handle` 作为第一个参数，内核首先对其进行检查，如果句柄非法或者对象类型与系统调用不匹配就会报错。
-接下来内核会检查句柄的权限是否满足操作的要求，例如 `write` 操作一般要求句柄具有 `WRITE` 权限，如果权限不满足就会继续报错。
+* Use: After obtaining a handle to an object, it can be manipulated by several system calls, such as [`zx_channel_write`].
+The kernel first checks the handle if it is illegal or if the object type does not match the system call.
+Next, the kernel checks whether the handle's permission meets the operation requirements. For example, the `write` operation generally requires the handle to have the `WRITE` permission, and will continue to report an error if the permission is not met.
 
-* 关闭：当用户程序不再使用对象时，会调用 [`zx_handle_close`] 关闭句柄。当用户进程退出时，仍处于打开状态的句柄也都会自动关闭。
+* Close: [`zx_handle_close`] is called when the user process is no longer using the object to close the handle. When the user process exits, any handles that are still open will also be closed automatically.
 
 [`zx_channel_create`]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/syscalls/channel_create.md
 [`zx_channel_write`]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/syscalls/channel_write.md
 [`zx_handle_close`]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/syscalls/handle_close.md
 
-我们还发现，有一类 Object 系统调用是对所有内核对象都适用的。
-这表明所有内核对象都有一些公共属性，例如 ID、名称等等。每一种内核对象也会有自己特有的属性。
+We also found that there is a class of Object system calls that are available for all kernel objects.
+This means that all kernel objects have some common properties, such as ID, name, etc. Each kernel object will also have its own specific properties.
 
-其中一些 Object 系统调用和信号相关。Zircon 每个内核对象都附带有 32 个 **[信号（Signals）]**，它们代表了不同类型的事件。
-与传统 Unix 系统的信号不同，它不能异步地打断用户程序运行，而只能由用户程序主动地阻塞等待在某个对象的某些信号上面。
-信号是 Zircon 内核中很重要的机制，不过这部分在前期不会涉及，我们留到第五章再具体实现。
+Some of the Object system calls are related to signals; Zircon has 32 **[Signals]** attached to each kernel object, which represent different types of events.
+Unlike signals in traditional Unix systems, they cannot interrupt the user program asynchronously, but can only be actively blocked by the user program waiting for some signal on an object.
+Signals are an important mechanism in the Zircon kernel, but we won't cover this part up front, so we'll leave the implementation to Chapter 5.
 
-[信号（Signals）]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/signals.md
+[Signals]: https://github.com/zhangpf/fuchsia-docs-zh-CN/blob/master/zircon/docs/signals.md
 
-以上我们了解了 Zircon 内核对象的相关概念和使用方式。接下来在这一节中，我们将用 Rust 实现内核对象的基本框架，以方便后续快速实现各种具体类型的内核对象。
-从传统面向对象语言的视角看，我们只是在实现一个基类。但由于 Rust 语言模型的限制，这件事情需要用到一些特殊的技巧。
+Above we have learned about the concepts and usage of Zircon kernel objects. In this section, we will implement the basic framework of kernel objects in Rust to facilitate the rapid implementation of various specific types of kernel objects.
+From the perspective of a traditional object-oriented language, we are only implementing a base class. However, due to the limitations of the Rust language model, this matter requires some special skills.
 
-## 建立项目
+## Building the project
 
-首先我们需要安装 Rust 工具链。在 Linux 或 macOS 系统下，只需要用一个命令下载安装 rustup 即可：
+First we need to install the Rust toolchain. On Linux or macOS systems, you can download and install rustup with a single command:
 
 ```sh
-$ curl https://sh.rustup.rs -sSf | sh
-```
+$ curl https://sh.rustup.rs -
 
-具体安装方法可以参考[官方文档]。
+You can refer to the [official documentation] for details on how to install it.
 
-[官方文档]: https://kaisery.github.io/trpl-zh-cn/ch01-01-installation.html
+[Official Documentation]: https://kaisery.github.io/trpl-zh-cn/ch01-01-installation.html
 
-接下来我们用 cargo 创建一个 Rust 库项目：
+Next we create a Rust library project with cargo:
 
 ```sh
 $ cargo new --lib zcore
 $ cd zcore
 ```
 
-我们将在这个 crate 中实现所有的内核对象，以库（lib）而不是可执行文件（bin）的形式组织代码，后面我们会依赖单元测试保证代码的正确性。
+We will implement all the kernel objects in this crate, organizing the code as a library (lib) rather than an executable (bin), and later we will rely on unit tests to ensure the correctness of the code.
 
-由于我们会用到一些不稳定（unstable）的语言特性，需要使用 nightly 版本的工具链。在项目根目录下创建一个 `rust-toolchain` 文件，指明使用的工具链版本：
+Since we will be using some unstable language features, we need to use the nightly version of the toolchain. Create a ``rust-toolchain`` file in the project root directory, specifying the version of the toolchain to use:
 
 ```sh
-{{#include ../../code/ch01-01/rust-toolchain}}
+{{#include ... /... /code/ch01-01/rust-toolchain}}
 ```
 
-这个程序库目前是在你的 Linux 或 macOS 上运行，但有朝一日它会成为一个真正的 OS 在裸机上运行。
-为此我们需要移除对标准库的依赖，使其成为一个不依赖当前 OS 功能的库。在 `lib.rs` 的第一行添加声明：
+This library is currently running on your Linux or macOS, but one day it will be a real OS running on bare metal.
+To do this we need to remove the dependency on the standard library and make it a library that does not depend on the current OS functionality. Add the following declaration to the first line of ``lib.rs``:
 
-```rust,noplaypen
+``rust,noplaypen
 // src/lib.rs
-#![no_std]
-extern crate alloc;
+#! [no_std]
+extern crate alloc.
 ```
 
-现在我们可以尝试运行一下自带的单元测试，编译器可能会自动下载并安装工具链：
+Now we can try to run the self-contained unit tests, and the compiler may automatically download and install the toolchain at
 
 ```sh
 $ cargo test
@@ -109,86 +108,86 @@ test tests::it_works ... ok
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
 
-## 实现 KernelObject 接口
+## Implementing the KernelObject interface
 
-所有的内核对象有一系列共同的属性和方法，我们称对象的方法为对象的公共**接口（Interface）**。
-同一种方法在不同类型的对象中可能会有不同的行为，在面向对象语言中我们称其为**多态（Polymorphism）**。
+All kernel objects have a set of properties and methods in common. We call the methods of an object the object's public **Interface**.
+The same method may have different behavior in different types of objects, which we call **Polymorphism** in object-oriented languages.
 
-Rust 是一门部分面向对象的语言，我们通常用它的 trait 实现接口和多态。
+Rust is a partially object-oriented language, and we usually use its traits to implement interfaces and polymorphism.
 
-首先创建一个 `KernelObject` trait 作为内核对象的公共接口：
+First create a ``KernelObject`` trait as a public interface to a kernel object:
 
 ```rust,noplaypen
-use alloc::string::String;
+use alloc::string::String.
 // src/object/mod.rs
-/// 内核对象公共接口
+/// public interface for kernel objects
 pub trait KernelObject: Send + Sync {
-{{#include ../../code/ch01-01/src/object/mod.rs:object}}
+{{#include ... /... /code/ch01-01/src/object/mod.rs:object}}
 
-{{#include ../../code/ch01-01/src/object/mod.rs:koid}}
+{{#include ... /... /code/ch01-01/src/object/mod.rs:koid}}
 ```
 
-这里的 [`Send + Sync`] 是一个约束所有 `KernelObject` 都要满足的前提条件，即它必须是一个**并发对象**。
-所谓并发对象指的是**可以安全地被多线程共享访问**。事实上我们的内核本身就是一个共享地址空间的多线程程序，在裸机上每个 CPU 核都可以被视为一个并发执行的线程。
-由于内核对象可能被多个线程同时访问，因此它必须是并发对象。
+Here [`Send + Sync`] is a precondition that binds all `KernelObject`s to be satisfied, i.e. it must be a **concurrent object**.
+By concurrent object we mean that **it can be safely accessed by multiple threads on a shared basis**. In fact our kernel itself is a multi-threaded program sharing an address space, and each CPU core on a bare metal machine can be considered as a concurrent thread of execution.
+Since a kernel object may be accessed by multiple threads at the same time, it must be a concurrent object.
 
 [`Send + Sync`]: https://kaisery.github.io/trpl-zh-cn/ch16-04-extensible-concurrency-sync-and-send.html
 
-## 实现一个空对象
+## Implementing an empty object
 
-接下来我们实现一个最简单的空对象 `DummyObject`，并为它实现 `KernelObject` 接口：
+Next we implement the simplest possible empty object, ``DummyObject``, and implement the ``KernelObject`` interface for it:
 
-```rust,noplaypen
+``rust,noplaypen
 // src/object/object.rs
-{{#include ../../code/ch01-01/src/object/object_v1.rs:dummy_def}}
+{{#include ... /... /code/ch01-01/src/object/object_v1.rs:dummy_def}}
 ```
 
-为了有效地支持操作系统中的并行和并发处理，我们这里采用了一种[**内部可变性**]的设计模式：将对象的所有可变的部分封装到一个内部对象 `DummyObjectInner` 中，并在原对象中用可保证互斥访问的自旋锁 [`Mutex`] 把它包起来，剩下的其它字段都是不可变的。
-`Mutex` 会用最简单的方式帮我们处理好并发访问问题：如果有其他人正在访问，我就在这里忙等。
-数据被 `Mutex` 包起来之后需要首先使用 [`lock()`] 拿到锁之后才能访问。此时并发访问已经安全，因此被包起来的结构自动具有了 `Send + Sync` 特性。
+To efficiently support parallelism and concurrent processing in the operating system, we use a [**internal mutability**] design pattern here: encapsulate all the mutable parts of the object into an internal object `DummyObjectInner` and wrap it in the original object with a spinlock [`Mutex`] that guarantees mutually exclusive access, leaving all the other fields immutable.
+The `Mutex` takes care of the concurrent access problem in the simplest way possible: if someone else is accessing it, I'll just wait here and be busy.
+Once the data is wrapped by `Mutex`, it needs to be locked first using [`lock()`] before it can be accessed. At this point concurrent access is safe, so the wrapped structure automatically has the `Send + Sync` feature.
 
 [`Mutex`]: https://docs.rs/spin/0.5.2/spin/struct.Mutex.html
 [`lock()`]: https://docs.rs/spin/0.5.2/spin/struct.Mutex.html#method.lock
-[**内部可变性**]: https://kaisery.github.io/trpl-zh-cn/ch15-05-interior-mutability.html
+[**Internal mutability**]: https://kaisery.github.io/trpl-zh-cn/ch15-05-interior-mutability.html
 
-使用自旋锁引入了新的依赖库 [`spin`] ，需要在 `Cargo.toml` 中加入以下声明：
+The use of spin locks introduces a new dependency library [`spin`] which requires the following declaration in `Cargo.toml`:
 
 [`spin`]: https://docs.rs/spin/0.5.2/spin/index.html
 
-```toml
+``toml
 [dependencies]
-{{#include ../../code/ch01-01/Cargo.toml:spin}}
+{{#include ... /... /code/ch01-01/Cargo.toml:spin}}
 ```
 
-然后我们为新对象实现构造函数：
+Then we implement the constructor for the new object:
 
 ```rust,noplaypen
 // src/object/object.rs
-{{#include ../../code/ch01-01/src/object/object_v1.rs:dummy_new}}
+{{#include ... /... /code/ch01-01/src/object/object_v1.rs:dummy_new}}
 ```
 
-根据文档描述，每个内核对象都有唯一的 ID。为此我们需要实现一个全局的 ID 分配方法。这里采用的方法是用一个静态变量存放下一个待分配 ID 值，每次分配就原子地 加`1`。
-ID 类型使用 `u64`，保证了数值空间足够大，在有生之年都不用担心溢出问题。在 Zircon 中 ID 从 1024 开始分配，1024 以下保留作内核内部使用。
+According to the documentation, each kernel object has a unique ID, so we need to implement a global ID assignment method. The method used here is to use a static variable to store the next ID to be allocated, and add `1` atomically each time it is allocated.
+The ID type is `u64`, which ensures that the value space is large enough that we don't have to worry about overflow problems in our lifetime. In Zircon, IDs are allocated from 1024 onwards, and below 1024 are reserved for internal kernel use.
 
-另外注意这里 `new` 函数返回类型不是 `Self` 而是 `Arc<Self>`，这是的[ `Arc` ]为了以后方便并行处理而做的统一约定。
+Also note that the return type of the `new` function is not `Self` but `Arc<Self>`, which is a uniform convention made by [ `Arc` ] to facilitate parallel processing in the future.
 
 [ `Arc` ]: https://doc.rust-lang.org/std/sync/struct.Arc.html
 
-最后我们为它实现 `KernelObject` 的基本接口：
+Finally we implement the basic interface of `KernelObject` for it:
 
-```rust,noplaypen
+``rust,noplaypen
 // src/object/object.rs
-{{#include ../../code/ch01-01/src/object/object_v1.rs:dummy_impl}}
+{{#include ... /... /code/ch01-01/src/object/object_v1.rs:dummy_impl}}
 ```
 
-到此为止，我们已经迈出了万里长征第一步，实现了一个最简单的功能。有实现，就要有测试！即使最简单的代码也要保证它的行为符合我们预期。
-只有对现有代码进行充分测试，在未来做添加和修改的时候，我们才有信心不会把事情搞砸。俗话讲"万丈高楼平地起"，把地基打好才能盖摩天大楼。
+At this point, we have taken the first step in a long journey to implement one of the simplest functions. With implementation, there must be testing! Even the simplest code has to make sure that it behaves as we expect it to.
+Only by fully testing the existing code can we be confident that we won't screw things up when we make future additions and changes. As the old saying goes, "A building is only as good as its foundation".
 
-为了证明上面代码的正确性，我们写一个简单的单元测试，替换掉自带的 `it_works` 函数：
+To prove the correctness of the above code, let's write a simple unit test replacing the self-contained `it_works` function:
 
-```rust,noplaypen
+``rust,noplaypen
 // src/object/object.rs
-{{#include ../../code/ch01-01/src/object/object_v1.rs:dummy_test}}
+{{#include ... /... /code/ch01-01/src/object/object_v1.rs:dummy_test}}
 ```
 
 ```sh
@@ -198,38 +197,38 @@ $ cargo test
 
 running 1 test
 test tests::dummy_object ... ok
-```
+OK.
 
-大功告成！让我们用 `cargo fmt` 命令格式化一下代码，然后记得 `git commit` 及时保存进展。
+Great job! Let's format the code with the `cargo fmt` command, and remember to `git commit` to save our progress in time.
 
-## 实现接口到具体类型的向下转换
+## Implementing interface to concrete type down conversion
 
-在系统调用中，用户进程会传入一个内核对象的句柄，然后内核会根据系统调用的类型，尝试将其转换成特定类型的对象。
-于是这里产生了一个很重要的需求：将接口 `Arc<dyn KernelObject>` 转换成具体类型的结构 `Arc<T> where T: KernelObject`。
-这种操作在面向对象语言中称为**向下转换（downcast）**。
+In a system call, the user process passes in a handle to a kernel object, which the kernel then tries to convert to a specific type of object, depending on the type of the system call.
+An important requirement arises here: converting the interface `Arc<dyn KernelObject>` to the concrete type structure `Arc<T> where T: KernelObject`.
+This operation is called **down conversion (downcast)** in object-oriented languages.
 
-在大部分编程语言中，向下转换都是一件非常轻松的事情。例如在 C/C++ 中，我们可以这样写：
+In most programming languages, down-conversion is a very easy task. In C/C++, for example, we can write it like this
 
 ```c++
-struct KernelObject {...};
-struct DummyObject: KernelObject {...};
+struct KernelObject {...} .
+struct DummyObject: KernelObject {...} .
 
-KernelObject *base = ...;
-// C 风格：强制类型转换
-DummyObject *dummy = (DummyObject*)(base);
-// C++ 风格：动态类型转换
-DummyObject *dummy = dynamic_cast<DummyObject*>(base);
+KernelObject *base = ... .
+// C style: forced type conversion
+DummyObject *dummy = (DummyObject*)(base).
+// C++ style: dynamic type conversion
+DummyObject *dummy = dynamic_cast<DummyObject*>(base).
 ```
 
-但在 Rust 中，由于其 trait 模型的限制，向下转换并不是一件容易的事情。
-虽然标准库中提供了 [`Any`] trait，部分实现了动态类型的功能，但实际操作起来却困难重重。
-不信邪的同学可以自己折腾一下：
+However, in Rust, down conversion is not an easy task due to the limitations of its trait model.
+Although the [`Any`] trait is provided in the standard library, which partially implements dynamic typing, it is difficult to do in practice.
+For those who don't believe in it, you can toss in your own:
 
-[`Any`]: https://doc.rust-lang.org/std/any/
+[``Any``]: https://doc.rust-lang.org/std/any/
 
 ```rust,editable
-# use std::any::Any;
-# use std::sync::Arc;
+# use std::any::Any.
+# use std::sync::Arc.
 # fn main() {}
 
 trait KernelObject: Any + Send + Sync {}
@@ -237,138 +236,125 @@ fn downcast_v1<T: KernelObject>(object: Arc<dyn KernelObject>) -> Arc<T> {
     object.downcast::<T>().unwrap()
 }
 fn downcast_v2<T: KernelObject>(object: Arc<dyn KernelObject>) -> Arc<T> {
-    let object: Arc<dyn Any + Send + Sync + 'static> = object;
+    let object: Arc<dyn Any + Send + Sync + 'static> = object.
     object.downcast::<T>().unwrap()
 }
 ```
 
-当然这个问题也困扰了 Rust 社区中的很多人。目前已经有人提出了一套不错的解决方案，就是我们接下来要引入的 [`downcast-rs`] 库：
+Of course this problem has plagued a lot of people in the Rust community. A nice solution has been proposed for the [`downcast-rs`] library, which we'll introduce next:
 
-[`downcast-rs`]: https://docs.rs/downcast-rs/1.2.0/downcast_rs/index.html
+[``downcast-rs``]: https://docs.rs/downcast-rs/1.2.0/downcast_rs/index.html
 
 ```toml
 [dependencies]
-{{#include ../../code/ch01-01/Cargo.toml:downcast}}
+{{#include ... /... /code/ch01-01/Cargo.toml:downcast}}
 ```
 
-（题外话：这个库原来是不支持 `no_std` 的，zCore 有这个需求，于是就顺便帮他实现了一把）
+(As an aside: this library originally did not support `no_std`, and zCore had a need for it, so we helped him implement it)
 
-按照[`downcast-rs`] 文档的描述，我们要为自己的接口实现向下转换，只需以下修改：
+As described in the [``downcast-rs``] documentation, to implement a down-conversion for our own interface, we just need to make the following changes:
 
-```rust,noplaypen
+``rust,noplaypen
 // src/object/mod.rs
-use core::fmt::Debug;
-use downcast_rs::{impl_downcast, DowncastSync};
+use core::fmt::Debug.
+use downcast_rs::{impl_downcast, DowncastSync}.
 
 pub trait KernelObject: DowncastSync + Debug {...}
 impl_downcast!(sync KernelObject);
 ```
 
-其中 `DowncastSync` 代替了原来的 `Send + Sync`，`Debug` 用于出错时输出调试信息。
-`impl_downcast!` 宏用来帮我们自动生成转换函数，然后就可以用 `downcast_arc` 来对 `Arc` 做向下转换了。我们直接来测试一把：
+where `DowncastSync` replaces `Send + Sync` and `Debug` is used to output debugging information in case of errors.
+The `impl_downcast!` macro is used to automatically generate the conversion function for us, and then we can use `downcast_arc` to do the down conversion on `Arc`. Let's test one directly:
 
-```rust,noplaypen
-// src/object/object.rs
-{{#include ../../code/ch01-01/src/object/object_v1.rs:downcast_test}}
-```
+``
 
-```sh
-$ cargo test
-    Finished test [unoptimized + debuginfo] target(s) in 0.47s
-     Running target/debug/deps/zcore-ae1be84852989b13
+## Simulating inheritance: Automatically generating interface implementation code with macros
 
-running 2 tests
-test object::downcast ... ok
-test object::tests::dummy_object ... ok
-```
+Above we have fully implemented a kernel object and the code looks very clean. However, when we want to implement more objects, a problem arises:
+These objects have some common properties and interface methods have a common implementation.
+In traditional OOP languages, we usually use **inheritance** to reuse this public code: child class B can inherit from parent class A and then automatically have all the fields and methods of the parent class.
 
-## 模拟继承：用宏自动生成接口实现代码
+Inheritance is a very powerful feature, but its drawbacks have been discovered over time. Interested readers can take a look at the discussion on Zhihu: [* What are the disadvantages of object-oriented programming? *].
+The classic work "Design Patterns" encourages people to **use combinations instead of inheritance**. And some modern programming languages, such as Go and Rust, even abandon inheritance outright. In Rust, inheritance is often partially emulated using combinatorial structures and [`Deref`] traits.
 
-上面我们已经完整实现了一个内核对象，代码看起来很简洁。但当我们要实现更多对象的时候，就会发现一个问题：
-这些对象拥有一些公共属性，接口方法也有共同的实现。
-在传统 OOP 语言中，我们通常使用 **继承（inheritance）** 来复用这些公共代码：子类 B 可以继承父类 A，然后自动拥有父类的所有字段和方法。
-
-继承是一个很强大的功能，但在长期实践中人们也逐渐发现了它的弊端。有兴趣的读者可以看一看知乎上的探讨：[*面向对象编程的弊端是什么？*]。
-经典著作《设计模式》中就鼓励大家**使用组合代替继承**。而一些现代的编程语言，如 Go 和 Rust，甚至直接抛弃了继承。在 Rust 中，通常使用组合结构和 [`Deref`] trait 来部分模拟继承。
-
-[*面向对象编程的弊端是什么？*]: https://www.zhihu.com/question/20275578/answer/26577791
+What are the disadvantages of [* object-oriented programming? *]: https://www.zhihu.com/question/20275578/answer/26577791
 [`Deref`]: https://kaisery.github.io/trpl-zh-cn/ch15-02-deref.html
 
-> 继承野蛮，trait 文明。 —— 某 Rust 爱好者
+> Inheritance is barbaric, trait is civilized. -- some Rust enthusiast
 
-接下来我们模仿 `downcast-rs` 库的做法，使用一种基于宏的代码生成方案，来实现 `KernelObject` 的继承。
-当然这只是抛砖引玉，如果读者自己实现了，或者了解到社区中有更好的解决方案，也欢迎指出。
+Next we'll mimic the `downcast-rs` library and use a macro-based code generation scheme to implement `KernelObject` inheritance.
+Of course, this is only a throwaway, so if readers have implemented it themselves, or if they know of a better solution in the community, they are welcome to point it out.
 
-具体做法是这样的：
+The approach is as follows:
 
-- 使用一个 struct 来提供所有的公共属性和方法，作为所有子类的第一个成员。
-- 为子类实现 trait 接口，所有方法直接委托给内部 struct 完成。这部分使用宏来自动生成模板代码。
+- Use a struct to provide all public properties and methods as the first member of all subclasses.
+- Implement the trait interface for the subclasses, and delegate all methods directly to the internal struct. This part uses macros to automatically generate the template code.
 
-而所谓的内部 struct，其实就是我们上面实现的 `DummyObject`。为了更好地体现它的功能，我们给他改个名叫 `KObjectBase`：
+The so-called internal struct is actually the `DummyObject` we implemented above. To better reflect its functionality, let's rename it `KObjectBase`:
 
-```rust,noplaypen
+``rust,noplaypen
 // src/object/mod.rs
-{{#include ../../code/ch01-01/src/object/mod.rs:base_def}}
+{{#include ... /... /code/ch01-01/src/object/mod.rs:base_def}}
 ```
 
-接下来我们把它的构造函数改为实现 `Default` trait，并且公共属性和方法都指定为 `pub`：
+Next we change its constructor to implement the ``Default`` trait, and specify the public properties and methods as ``pub``:
 
 ```rust,noplaypen
 // src/object/mod.rs
-{{#include ../../code/ch01-01/src/object/mod.rs:base_default}}
+{{#include ... /... /code/ch01-01/src/object/mod.rs:base_default}}
 impl KObjectBase {
-    /// 生成一个唯一的 ID
+    /// Generate a unique ID
     fn new_koid() -> KoID {...}
-    /// 获取对象名称
+    /// Get the object name
     pub fn name(&self) -> String {...}
-    /// 设置对象名称
+    /// Set the object name
     pub fn set_name(&self, name: &str) {...}
 }
 ```
 
-最后来写一个魔法的宏！
+And finally a magic macro!
 
 ```rust,noplaypen
 // src/object/mod.rs
-{{#include ../../code/ch01-01/src/object/mod.rs:impl_kobject}}
+{{#include ... /... /code/ch01-01/src/object/mod.rs:impl_kobject}}
 ```
 
-轮子已经造好了！让我们看看如何用它方便地实现一个内核对象，仍以 `DummyObject` 为例：
+The wheel is built! Let's see how we can use it to conveniently implement a kernel object, still using ``DummyObject`` as an example:
 
 ```rust,noplaypen
 // src/object/mod.rs
-{{#include ../../code/ch01-01/src/object/mod.rs:dummy}}
+{{#include ... /... /code/ch01-01/src/object/mod.rs:dummy}}
 ```
 
-是不是方便了很多？最后按照惯例，用单元测试检验实现的正确性：
+Isn't that a lot easier? Finally, as is customary, check the correctness of the implementation with unit tests: ``
 
 ```rust,noplaypen
 // src/object/mod.rs
-{{#include ../../code/ch01-01/src/object/mod.rs:dummy_test}}
+{{#include ... /... /code/ch01-01/src/object/mod.rs:dummy_test}}
 ```
 
-有兴趣的读者可以继续探索使用功能更强大的 [**过程宏（proc_macro）**]，进一步简化实现新内核对象所需的模板代码。
-如果能把上面的代码块缩小成下面这两行，就更加完美了：
+Interested readers can continue to explore the use of the more powerful [**procedure macro (proc_macro)**] to further simplify the template code needed to implement the new kernel object.
+It would be even better if the above block of code could be reduced to the following two lines:
 
-[**过程宏（proc_macro）**]: https://doc.rust-lang.org/proc_macro/index.html
+[**procedure macro (proc_macro)**]: https://doc.rust-lang.org/proc_macro/index.html
 
 ```rust,noplaypen
 #[KernelObject]
-pub struct DummyObject;
+pub struct DummyObject.
 ```
 
-## 总结
+## Summary
 
-在这一节中我们用 Rust 语言实现了 Zircon 最核心的**内核对象**概念。在此过程中涉及到 Rust 的一系列语言特性和设计模式：
+In this section we have implemented the core **KernelObject** concept of Zircon in Rust. A number of Rust language features and design patterns were involved in this process:
 
-- 使用 **trait** 实现接口
-- 使用 **内部可变性** 模式实现并发对象
-- 基于社区解决方案实现 trait 到 struct 的 **向下转换**
-- 使用组合模拟继承，并使用 **宏** 实现模板代码的自动生成
+- Implementing interfaces using **trait**
+- Implementing concurrent objects using the **internal mutability** pattern
+- Implementing a **down conversion** of trait to struct based on community solutions
+- Simulation of inheritance using combinations and automatic generation of template code using **macros**
 
-由于 Rust 独特的[面向对象编程特性]，我们在实现内核对象的过程中遇到了一定的挑战。
-不过万事开头难，解决这些问题为整个项目打下了坚实基础，后面实现新的内核对象就会变得简单很多。
+Due to Rust's unique [object-oriented programming features], we encountered some challenges in implementing kernel objects.
+But everything is difficult at the beginning, and solving these problems lays a solid foundation for the whole project, and it becomes much easier to implement new kernel objects later.
 
-[面向对象编程特性]: https://kaisery.github.io/trpl-zh-cn/ch17-00-oop.html
+[Object-Oriented Programming Features]: https://kaisery.github.io/trpl-zh-cn/ch17-00-oop.html
 
-在下一节中，我们将介绍内核对象相关的另外两个概念：句柄和权限，并实现内核对象的存储和访问。
+In the next section, we will introduce two other concepts related to kernel objects: handles and permissions, and implement storage and access to kernel objects.

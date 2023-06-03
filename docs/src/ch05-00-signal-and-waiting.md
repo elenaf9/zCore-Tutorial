@@ -1,23 +1,23 @@
-# 信号和等待
+# Signaling and waiting
 
-## 信号
+## Signals
 
-对象可能有多达 32 个信号（由 zx_signals *t 类型和 ZX* **SIGNAL** 定义表示），它们表示有关其当前状态的一条信息。例如，通道和套接字可能是 READABLE 或 WRITABLE 的。进程或线程可能会被终止。等等。
+Objects may have up to 32 signals (represented by the zx_signals *t type and the ZX* **SIGNAL** definition), which represent a piece of information about their current state. For example, channels and sockets may be READABLE or WRITABLE. Processes or threads may be terminated. And so on.
 
-线程可以等待信号在一个或多个对象上变为活动状态。
+A thread may wait for a signal to become active on one or more objects.
 
-## 等待
+## Waiting
 
-线程可用于[`zx_object_wait_one()`](https://fuchsia.dev/docs/reference/syscalls/object_wait_one) 等待单个句柄上的信号处于活动状态或 [`zx_object_wait_many()`](https://fuchsia.dev/docs/reference/syscalls/object_wait_many)等待多个句柄上的信号。两个调用都允许超时，即使没有信号挂起，它们也会返回。
+A thread may be used to [`zx_object_wait_one()`](https://fuchsia.dev/docs/reference/syscalls/object_wait_one) wait for a signal on a single handle to become active or [`zx_object_wait_many() `](https://fuchsia.dev/docs/reference/syscalls/object_wait_many) waits for signals on multiple handles. Both calls allow timeouts, and they return even if no signals are pending.
 
-超时可能会偏离指定的截止时间，具体取决于计时器的余量。
+The timeout may deviate from the specified deadline, depending on the timer margin.
 
-如果线程要等待大量句柄，使用端口（Port）会更有效，它是一个对象，其他对象可能会绑定到这样的对象，当信号在它们上被断言时，端口会收到一个包含信息的数据包关于未决信号。
+If the thread has to wait for a large number of handles, it is more efficient to use a port, which is an object to which other objects may be bound, and when the signal is asserted on them, the port receives a packet containing information about the pending signal.
 
-## 事件与事件对
+## Events and Event Pairs
 
-事件（Event）是最简单的对象，除了它的活动信号集合之外没有其他状态。
+An Event (Event) is the simplest object, with no state other than its collection of active signals.
 
-事件对（Event Pair）是可以相互发出信号的一对事件中的一个。事件对的一个有用属性是，当一对的一侧消失时（它的所有句柄都已关闭），PEER_CLOSED 信号在另一侧被断言。
+An Event Pair is one of a pair of events that can signal each other. A useful property of an Event Pair is that when one side of the pair disappears (all its handles are closed), the PEER_CLOSED signal is asserted on the other side.
 
-见：[`zx_event_create()`](https://fuchsia.dev/docs/reference/syscalls/event_create), 和[`zx_eventpair_create()`](https://fuchsia.dev/docs/reference/syscalls/eventpair_create)。
+See: [`zx_event_create()`](https://fuchsia.dev/docs/reference/syscalls/event_create), and [`zx_eventpair_create()`](https://fuchsia.dev/) docs/reference/syscalls/eventpair_create).

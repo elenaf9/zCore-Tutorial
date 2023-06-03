@@ -1,17 +1,17 @@
-# 用户态同步互斥：Futex 对象
+# User-state synchronous mutual exclusion: Futex objects
 
-## Futex 机制简介
+## Introduction to the Futex mechanism
 
-> Futex 是现代 OS 中用户态同步互斥的唯一底层设施
+> Futex is the only underlying facility for user-state synchronous mutual exclusion in modern OS
 >
-> 为什么快：利用共享内存中的原子变量，避免进入内核
+> Why it's fast: use atomic variables in shared memory to avoid going into the kernel
 
-Futexes 是内核原语，与用户空间原子操作一起使用以实现高效的同步原语（如Mutexes， Condition Variables等），它只需要在竞争情况（contended case）下才进行系统调用。通常它们实现在标准库中。
+Futexes are kernel primitives that are used together with user-space atomic operations for efficient synchronization primitives (e.g. Mutexes, Condition Variables, etc.) that require system calls only in contended cases. Usually they are implemented in the standard library.
 
-## 实现基础元语：wait 和 wake
+## Implementing the base metaphrases: wait and wake
 
-> 实现 wait 和 wake 函数，并做单元测试
+## Implement wait and wake functions and do unit tests
 
-## 实现高级操作
+## Implement advanced operations
 
-> 实现 Zircon 中定义的复杂 API
+> implement complex APIs defined in Zircon

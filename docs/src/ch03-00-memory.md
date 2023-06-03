@@ -1,1 +1,1 @@
-# 内存管理
+# Memory management

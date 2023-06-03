@@ -1,44 +1,45 @@
-# 物理内存：VMO 对象
+# Physical Memory: VMO Objects
 
-## VMO 简介
+## Introduction to VMO
 
-> 根据文档梳理 VMO 的主要特性
+> The main features of VMOs are outlined in the documentation
 
-虚拟拟内存对象（Virtual Memory Objects， VMO）代表一组物理内存页面，或 潜在的页面（将根据需要延迟创建/填充）。
+Virtual Memory Objects (VMOs) represent a set of physical memory pages, or potential pages (which will be created/populated on a delayed basis as needed).
 
-它们可以通过 [`zx_vmar_map()`](https://fuchsia.dev/docs/reference/syscalls/vmar_map)被映射到一个进程（Process）的地址空间，也可通过 [`zx_vmar_unmap()`](https://fuchsia.dev/docs/reference/syscalls/vmar_unmap)来解除映射。可以使用[`zx_vmar_protect()`](https://fuchsia.dev/docs/reference/syscalls/vmar_protect)来调整映射页面的权限。
+They can be mapped to the address space of a Process via [`zx_vmar_map()`](https://fuchsia.dev/docs/reference/syscalls/vmar_map), or via [`zx_vmar_unmap()`](https. //fuchsia.dev/docs/reference/syscalls/vmar_unmap) to unmap it. You can use [`zx_vmar_protect()`](https://fuchsia.dev/docs/reference/syscalls/vmar_protect) to adjust the permissions of the mapped pages.
 
-也可以直接使用[`zx_vmo_read()`](https://fuchsia.dev/docs/reference/syscalls/vmo_read)来读取VMO和通过使用 [`zx_vmo_write()`](https://fuchsia.dev/docs/reference/syscalls/vmo_write)来写入 VMO。因此，通过诸如“创建 VMO，将数据集写入其中，然后将其交给另一个进程使用”等一次性（one-shot ）操作，可以避免将它们映射到地址空间的开销。
+VMO can also be read directly using [`zx_vmo_read()`](https://fuchsia.dev/docs/reference/syscalls/vmo_read) and by using [`zx_vmo_write()`](https://fuchsia.dev/) Thus, by doing one-shot operations such as "create the VMO, write the dataset to it, and then give it to another process", you can avoid the overhead of mapping them to the address space.
 
-## 实现 VMO 对象框架
+## Implementing the VMO object framework
 
-> 实现 VmObject 结构，其中定义 VmObjectTrait 接口，并提供三个具体实现 Paged, Physical, Slice
+> Implement the VmObject structure, which defines the VmObjectTrait interface and provides three concrete implementations of Paged, Physical, and Slice
 
-VmObject 结构体
+VmObject structure
 
 ```rust
 // vm/vmo/mod.rs
 pub struct VmObject {
-    base: KObjectBase,
-    resizable: bool,
-    trait_: Arc<dyn VMObjectTrait>,
-    inner: Mutex<VmObjectInner>,
+    base: KObjectBase.
+    resizable: bool.
+    trait_: Arc<dyn VMObjectTrait>.
+    inner: Mutex<VmObjectInner>.
 }
 
-impl_kobject!(VmObject);
+impl_kobject!(VmObject).
 
 #[derive(Default)]
 struct VmObjectInner {
-    parent: Weak<VmObject>,
-    children: Vec<Weak<VmObject>>,
-    mapping_count: usize,
-    content_size: usize,
+    parent: Weak<VmObject>.
+    children: Vec<Weak<VmObject>>.
+    mapping_count: usize.
+    content_size: usize.
 }
 ```
-`trait_` 指向实现了 VMObjectTrait 的对象，它由三个具体实现，分别是 VMObjectPage, VMObjectPhysical, VMObjectSlice。VMObjectPaged 是按页分配内存，VMObjectSlice 主要用于共享内存，VMObjectPhysical 在 zCore-Tutorial 中暂时不会使用到。  
-`mapping_count` 表示这个 VmObject 被 map 到几个 VMAR 中。  
-`content_size` 是分配的物理内存的大小。  
-VmObjectTrait 定义了一组 VMObject* 共有的方法
+`trait_` points to an object that implements VMObjectTrait, which consists of three concrete implementations, VMObjectPage, VMObjectPhysical, VMObjectSlice. vMObjectPaged is for allocating memory per page, VMObjectSlice is mainly for shared memory. VMObjectPhysical will not be used in zCore-Tutorial for now.  
+`mapping_count` indicates how many VMARs this VmObject is mapped to.  
+`content_size` is the size of the allocated physical memory.  
+VmObjectTrait defines a set of methods common to VMObject*
+
 ```rust
 pub trait VMObjectTrait: Sync + Send {
     /// Read memory to `buf` from VMO at `offset`.
@@ -115,10 +116,11 @@ pub trait VMObjectTrait: Sync + Send {
     }
 }
 ```
-`read()` 和 `write()` 用于读和写，`zero()` 用于清空一段内存。  
-比较特别的是：`fn commit_page(&self, page_idx: usize, flags: MMUFlags) -> ZxResult<PhysAddr>;`，`fn commit(&self, offset: usize, len: usize) -> ZxResult;` 和 `fn commit(&self, offset: usize, len: usize) -> ZxResult;` 主要用于分配物理内存，因为一些内存分配策略，物理内存并不一定是马上分配的，所以需要 commit 来分配一块内存。  
-`pin` 和 `unpin` 在这里主要用于增加和减少引用计数。  
-VmObject 实现了不同的 new 方法，它们之间的差别在于实现 trait_ 的对象不同。
+`read()` and `write()` for reading and writing, and `zero()` for clearing a section of memory.  
+The special ones are: `fn commit_page(&self, page_idx: usize, flags: MMUFlags) -> ZxResult<PhysAddr>;`, `fn commit(&self, offset: usize, len: usize) -> ZxResult ;` and `fn commit(&self, offset: usize, len: usize) -> ZxResult;` are mainly used to allocate physical memory, because with some memory allocation policies, physical memory is not always allocated right away, so commit is needed to allocate a piece of memory.  
+`pin` and `unpin` are mainly used here to increase and decrease the reference count.  
+VmObject implements different new methods, the difference between them is that the objects that implement trait_ are different.
+
 ```rust
 impl VmObject {
     /// Create a new VMO backing on physical memory allocated in pages.
@@ -159,7 +161,7 @@ impl VmObject {
     }
 }
 ```
-通过 `pub fn create_child(self: &Arc<Self>, resizable: bool, offset: usize, len: usize)` 可以创建一个 VMObject 的快照副本。
+A snapshot copy of a VMObject can be created by `pub fn create_child(self: &Arc<Self>, resizable: bool, offset: usize, len: usize)`.
 ```rust
 impl VmObject {
 	/// Create a child VMO.
@@ -189,25 +191,30 @@ impl VmObject {
 	/// Add child to the list
     fn add_child(&self, child: &Arc<VmObject>) {
         let mut inner = self.inner.lock();
-		// 判断这个 child VmObject 是否还是存在，通过获取子对象的强引用数来判断
+        // Determine if this child VmObject still exists, by getting the number of strong references to the child object
         inner.children.retain(|x| x.strong_count() != 0);
 		// downgrade 将 Arc 转为 Weak
         inner.children.push(Arc::downgrade(child));
     }
 }
 ```
-## HAL：用文件模拟物理内存
+## HAL: Emulating physical memory with files
 
-> 初步介绍 mmap，引出用文件模拟物理内存的思想
+> Introduce mmap to introduce the idea of emulating physical memory with files
 >
-> 创建文件并用 mmap 线性映射到进程地址空间
+> Create a file and map it linearly to the process address space with mmap
 >
-> 实现 pmem_read, pmem_write
+> implement pmem_read, pmem_write
+
 ### mmap
-mmap是一种内存映射文件的方法，将一个文件或者其它对象映射到进程的地址空间，实现文件磁盘地址和进程虚拟地址空间中一段虚拟地址一一对应的关系。实现这样的映射关系后，进程就可以采用指针的方式读写操作这一段内存，而系统会自动回写脏页面到对应的文件磁盘上，即完成了对文件的操作而不必再调用read,write等系统调用函数。相反，内核空间对这段区域的修改也直接反映用户空间，从而可以实现不同进程间的文件共享。因此，新建一个文件，然后调用 mmap，其实就相当于分配了一块物理内存，因此我们可以用文件来模拟物理内存。
-![mmap.png](img/mmap.png)
-### 分配地址空间
-创建一个文件用于 mmap 系统调用。  
+
+mmap is a memory-mapped file method that maps a file or other object to the process address space, achieving a one-to-one relationship between the file's disk address and a virtual address in the process virtual address space. Once such a mapping relationship is achieved, the process can read and write to this section of memory using pointers, and the system will automatically write back dirty pages to the corresponding file disk, i.e., it is done with the file without having to call read, write, and other system calls. Conversely, changes to this area in kernel space are directly reflected in user space, allowing file sharing between processes. Therefore, creating a new file and calling mmap is actually equivalent to allocating a piece of physical memory, so we can use the file to emulate physical memory.
+! [mmap.png](img/mmap.png)
+
+### Allocate address space
+
+Create a file for the mmap system call.
+
 ```rust
 fn create_pmem_file() -> File {
     let dir = tempdir().expect("failed to create pmem dir");
@@ -228,7 +235,7 @@ fn create_pmem_file() -> File {
         .expect("failed to resize file");
     trace!("create pmem file: path={:?}, size={:#x}", path, PMEM_SIZE);
     let prot = libc::PROT_READ | libc::PROT_WRITE;
-    // 调用 mmap （这个不是系统调用）进行文件和内存之间的双向映射
+    // Call mmap (this is not a system call) to do a two-way mapping between file and memory
     mmap(file.as_raw_fd(), 0, PMEM_SIZE, phys_to_virt(0), prot);
     file
 }
@@ -237,7 +244,7 @@ mmap:
 ```rust
 /// Mmap frame file `fd` to `vaddr`.
 fn mmap(fd: libc::c_int, offset: usize, len: usize, vaddr: VirtAddr, prot: libc::c_int) {
-    // 根据不同的操作系统去修改权限
+    // Modify permissions according to different operating systems
 	// workaround on macOS to write text section.
     #[cfg(target_os = "macos")]
     let prot = if prot & libc::PROT_EXEC != 0 {
@@ -246,7 +253,7 @@ fn mmap(fd: libc::c_int, offset: usize, len: usize, vaddr: VirtAddr, prot: libc:
         prot
     };
 		
-	// 调用 mmap 系统调用，ret 为返回值
+	// call the mmap system call, ret is the return value
     let ret = unsafe {
         let flags = libc::MAP_SHARED | libc::MAP_FIXED;
         libc::mmap(vaddr as _, len, prot, flags, fd, offset as _)
@@ -262,7 +269,7 @@ fn mmap(fd: libc::c_int, offset: usize, len: usize, vaddr: VirtAddr, prot: libc:
     assert_eq!(ret, vaddr, "failed to mmap: {:?}", Error::last_os_error());
 }
 ```
-最后创建一个全局变量保存这个分配的内存
+Finally, create a global variable to hold this allocated memory
 ```rust
 lazy_static! {
     static ref FRAME_FILE: File = create_pmem_file();
@@ -298,12 +305,12 @@ fn ensure_mmap_pmem() {
     FRAME_FILE.as_raw_fd();
 }
 ```
-`ensure_mmap_pmem()` 确保物理内存已经映射  
-`copy_to_nonoverlapping(self, dst *mut T, count: usize)` 将 self 的字节序列拷贝到 dst 中，source 和 destination 是不互相重叠的。`(phys_to_virt(paddr) as *const u8).copy_to_nonoverlapping(buf.as_mut_ptr(), buf.len());` 通过 `phys_to_virt(paddr)` 将 paddr 加上 PMEM_BASE 转为虚拟地址，然后将里面的字节拷贝到 buf 里面。
-## 实现物理内存 VMO
+`ensure_mmap_pmem()` Ensure that physical memory is mapped  
+`copy_to_nonoverlapping(self, dst *mut T, count: usize)` Copy self's byte sequence into dst, source and destination are not overlapping each other. `(phys_to_virt(paddr) as *const u8).copy_to_nonoverlapping(buf.as_mut_ptr(), buf.len());` by `phys_to_virt(paddr)` convert paddr plus PMEM_BASE to virtual address, then copy the bytes inside to buf.
+## Implement physical memory VMO
 
-> 用 HAL 实现 VmObjectPhysical 的方法，并做单元测试
-物理内存 VMO 结构体：
+> Implement the VmObjectPhysical method with HAL and do unit tests
+Physical memory VMO structure:
 ```rust
 pub struct VMObjectPhysical {
     paddr: PhysAddr,
@@ -317,7 +324,7 @@ struct VMObjectPhysicalInner {
     cache_policy: CachePolicy,
 }
 ```
-这里比较奇怪的是 data_lock 这个字段，这个字段里 Mutex 的泛型类型是一个 unit type，其实相当于它是没有“值”的，它只是起到一个锁的作用。
+What is strange here is the data_lock field, the generic type of Mutex in this field is a unit type, in fact, it is equivalent to it is no "value", it only plays the role of a lock.
 ```rust
 impl VMObjectTrait for VMObjectPhysical {
     fn read(&self, offset: usize, buf: &mut [u8]) -> ZxResult {
@@ -328,10 +335,11 @@ impl VMObjectTrait for VMObjectPhysical {
     }
 }
 ```
-## 实现切片 VMO
+## Implement slicing VMO
 
-> 实现 VmObjectSlice，并做单元测试
-VMObjectSlice 中的 parent 用于指向一个实际的 VMO 对象，比如：VMObjectPaged，这样通过 VMObjectSlice 就可以实现对 VMObjectPaged 的共享。
+> Implement VmObjectSlice and do unit tests
+The parent in VMObjectSlice is used to point to an actual VMO object, e.g., VMObjectPaged, so that sharing of VMObjectPaged can be achieved through VMObjectSlice.
+
 ```rust
 pub struct VMObjectSlice {
     /// Parent node.
@@ -359,7 +367,7 @@ impl VMObjectSlice {
     }
 }
 ```
-VMObjectSlice 实现的读写，第一步是 `check_range` ，第二步是调用 parent 中的读写方法。
+VMObjectSlice implements read/write, the first step is `check_range` and the second step is to call the read/write method in parent.
 ```rust
 impl VMObjectTrait for VMObjectSlice {
     fn read(&self, offset: usize, buf: &mut [u8]) -> ZxResult {

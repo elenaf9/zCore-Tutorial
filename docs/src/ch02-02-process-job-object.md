@@ -1,79 +1,78 @@
-# 进程管理：Process 与 Job 对象
+# Process management: Process and Job objects
 
 
 
-> 介绍 Process 与 Job 的整体设计
+> Introduction to the overall design of Process and Job
 >
-> 实现 Process 和 Job 对象的基本框架，支持树状结构
+> Basic framework for implementing Process and Job objects, supporting tree structure
 >
 
-## 作业Job
-### 概要
-作业是一组进程，可能还包括其他（子）作业。作业用于跟踪执行内核操作的特权（即使用各种选项进行各种syscall），以及跟踪和限制基本资源（例如内存，CPU）的消耗。每个进程都属于一个作业。作业也可以嵌套，并且除根作业外的每个作业都属于一个（父）作业。
-### 描述
+## Job
+### Overview
+A job is a group of processes, and possibly other (sub)jobs. Jobs are used to keep track of the privilege of performing kernel operations (i.e. various syscalls using various options), as well as to track and limit the consumption of basic resources (e.g. memory, CPU). Each process belongs to a job. Jobs can also be nested, and each job except the root job belongs to a (parent) job.
+### Description
 
-作业是包含以下内容的对象：
+A job is an object that contains the following:
 
-- 对父作业的引用
-- 一组子作业（每个子作业的父作业既是这个作业）
-- 一组成员进程
-- 一套策略（Policy）
+- A reference to the parent job
+- A set of child jobs (the parent of each child job is both this job)
+- A set of member processes
+- A set of policies
 
-由多个进程组成的“应用程序”可作为单个实体，被作业基于一套策略进行控制。
+An "application" consisting of multiple processes can be controlled by a job as a single entity based on a set of policies.
 
-### 作业策略Job Policy 
+### Job Policy 
 
-[策略policy](https://fuchsia.dev/fuchsia-src/concepts/settings/policy/policy_concepts?hl=en) 可在Kernel运行时动态修改系统的各种配置（setting）。作业策略主要涉及作业安全性和资源使用的条件（Condition）限制。
+The [policy policy](https://fuchsia.dev/fuchsia-src/concepts/settings/policy/policy_concepts?hl=en) can dynamically modify various configurations (settings) of the system while the Kernel is running. Job policies are mainly concerned with job security and condition restrictions on resource usage.
 
-#### 策略的行为PolicyAction
+#### Policy ActionsPolicyAction
 
-策略的行为包括：
+The policy actions include
 
-- Allow 允许条件
-- Deny 拒绝条件
-- AllowException 通过 debugt port 生成异常，异常处理完毕后可恢复执行且运行条件
-- DenyException 通过 debugt port 生成异常，异常处理完毕后可恢复执行
-- Kill 杀死进程
+- Allow Allow conditions
+- Deny Deny condition
+- AllowException generates an exception through the debugt port and resumes execution after the exception is handled and the condition is run
+- DenyException Generates an exception through the debugt port and resumes execution after the exception is handled
+- Kill Kills the process.
 
-#### 应用策略时的条件 PolicyCondition
+#### Conditions when applying policies PolicyCondition
 
-应用策略时的条件包括：
+The conditions when applying policy include
 
-- BadHandle： 此作业下的某个进程正在尝试发出带有无效句柄的syscall。在这种情况下，`PolicyAction::Allow`并且`PolicyAction::Deny`是等效的：如果syscall返回，它将始终返回错误ZX_ERR_BAD_HANDLE。
-- WrongObject：此作业下的某个进程正在尝试发出带有不支持该操作的句柄的syscall。
-- VmarWx：此作业下的进程正在尝试映射具有写执行访问权限的地址区域。
-- NewAny：代表上述所有ZX_NEW条件的特殊条件，例如NEW_VMO，NEW_CHANNEL，NEW_EVENT，NEW_EVENTPAIR，NEW_PORT，NEW_SOCKET，NEW_FIFO和任何将来的ZX_NEW策略。这将包括不需要父对象来创建的所有新内核对象。
-- NewVMO：此作业下的某个进程正在尝试创建新的vm对象。
-- NewChannel：此作业下的某个进程正在尝试创建新通道。
-- NewEvent：此作业下的一个进程正在尝试创建一个新事件。
-- NewEventPair：此作业下的某个进程正在尝试创建新的事件对。
-- NewPort：此作业下的进程正在尝试创建新端口。
-- NewSocket：此作业下的进程正在尝试创建新的套接字。
-- NewFIFO：此工作下的一个进程正在尝试创建一个新的FIFO。
-- NewTimer：此作业下的某个进程正在尝试创建新的计时器。
-- NewProcess：此作业下的进程正在尝试创建新进程。
-- NewProfile：此作业下的一个进程正在尝试创建新的配置文件。
-- AmbientMarkVMOExec：此作业下的某个进程正在尝试使用带有ZX_HANDLE_INVALID的zx_vmo_replace_as_executable（）作为第二个参数，而不是有效的ZX_RSRC_KIND_VMEX。
+- BadHandle: A process under this job is trying to issue a syscall with an invalid handle. in this case, `PolicyAction::Allow` and `PolicyAction::Deny` are equivalent: if the syscall returns, it will always return the error ZX_ERR_BAD_HANDLE. HANDLE.
+- WrongObject: A process under this job is trying to issue a syscall with a handle that does not support the action.
+- VmarWx: A process under this job is trying to map an address area that has write access.
+- NewAny: A special condition representing all of the above ZX_NEW conditions, such as NEW_VMO, NEW_CHANNEL, NEW_EVENT, NEW_EVENTPAIR, NEW_PORT, NEW_SOCKET, NEW_FIFO and any future ZX_NEW policies. This will include all new kernel objects that do not require a parent object to create.
+- NewVMO: A process under this job is trying to create a new vm object.
+- NewChannel: A process under this job is trying to create a new channel.
+- NewEvent: A process under this job is trying to create a new event.
+- NewEventPair: A process under this job is trying to create a new event pair.
+- NewPort: A process under this job is trying to create a new port.
+- NewSocket: A process under this job is trying to create a new socket.
+- NewFIFO: A process under this job is trying to create a new FIFO.
+- NewTimer: A process under this job is trying to create a new timer.
+- NewProcess: A process under this job is trying to create a new process.
+- NewProfile: A process under this job is trying to create a new profile.
+- AmbientMarkVMOExec: A process under this job is trying to use zx_vmo_replace_as_executable() with ZX_HANDLE_INVALID as the second argument instead of the valid ZX_RSRC_KIND_VMEX.
 
-## 进程Process
+## ProcessProcess
 
-进程是传统意义上程序的一个运行实例，包含一组指令和数据，这些指令将由一个或多个线程执行，并拥有一组资源。在具体实现上，进程包括如下内容：
+A process is a running instance of a program in the traditional sense, containing a set of instructions and data that will be executed by one or more threads, and having a set of resources. In terms of concrete implementation, a process consists of the following:
 
-- Handles ：大部分是进程用到的资源对象的句柄
-- Virtual Memory Address Regions：进程所在的内存地址空间
-- Threads：进程包含的线程组
+- Handles: mostly handles to resource objects used by the process
+- Virtual Memory Address Regions: the memory address space where the process is located
+- Threads: the group of threads that the process contains
 
 
 
-进程包含在作业（Job）的管理范畴之中。从资源和权限限制以及生命周期控制的角度来看，允许将由多个进程组成的应用程序视为一个实体（即作业）。
+Processes are included in the scope of Job management. From the point of view of resource and permission constraints and lifecycle control, it is allowed to consider an application consisting of multiple processes as a single entity (i.e. a job).
 
-### 生命周期(lifetime)
-进程有自己的生命周期，从开始创建到直到被强制终止或程序退出为止。可通过调用`Process::create()`创建一个进程，并调用`Process::start()`开始执行 。该进程在以下情况下停止执行：
+### Life cycle (lifetime)
+Processes have their own lifecycle, from the time they are created until they are forced to terminate or the program exits. A process can be created by calling `Process::create()` and started by calling `Process::start()` . The process stops executing when
 
-- 最后一个线程终止或退出
-- 进程调用 `Process::exit()`
-- 父作业（parent job）终止了该过程
-- 父作业（parent job）被销毁（destroied）
+- The last thread terminates or quits
+- The process calls `Process::exit()`
+- The parent job terminates the process
+- The parent job is destroyed (destroied)
 
-注：`Process::start()`不能被调用两次。新线程不能被添加到已启动的进程。
-
+Note: `Process::start()` cannot be called twice. New threads cannot be added to a process that has already been started.

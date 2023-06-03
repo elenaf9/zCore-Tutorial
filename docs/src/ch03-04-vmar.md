@@ -1,58 +1,58 @@
-# 虚拟内存：VMAR 对象
+## Virtual Memory: VMAR Objects
 
-## VMAR 简介
+## VMAR Introduction
 
-虚拟内存地址区域（Virtual Memory Address Regions ，VMARs）为管理进程的地址空间提供了一种抽象。在进程创建时，将Root VMAR 的句柄提供给进程创建者。该句柄指的是跨越整个地址空间的 VMAR。这个空间可以通过[`zx_vmar_map()`](https://fuchsia.dev/docs/reference/syscalls/vmar_map)和 [`zx_vmar_allocate()`](https://fuchsia.dev/docs/reference/syscalls/vmar_allocate)接口来划分 。 [`zx_vmar_allocate()`](https://fuchsia.dev/docs/reference/syscalls/vmar_allocate)可用于生成新的 VMAR（称为子区域或子区域），可用于将地址空间的各个部分组合在一起。
+Virtual Memory Address Regions (VMARs) provide an abstraction for managing a process's address space. A handle to a Root VMAR is provided to the process creator at process creation time. This handle refers to a VMAR that spans the entire address space. This space can be accessed via [`zx_vmar_map()`](https://fuchsia.dev/docs/reference/syscalls/vmar_map) and [`zx_vmar_allocate()`](https:/ /fuchsia.dev/docs/reference/syscalls/vmar_allocate) interfaces to divide . [`zx_vmar_allocate()`](https://fuchsia.dev/docs/reference/syscalls/vmar_allocate) can be used to generate new VMARs (called sub-regions or sub-regions) that can be used to group parts of the address space together.
 
-## 实现 VMAR 对象框架
+## Implement the VMAR object framework
 
-> 定义 VmAddressRange，VmMapping
+> Define VmAddressRange, VmMapping
 >
-> 实现 create_child, map, unmap, destroy 函数，并做单元测试验证地址空间分配
+> Implement create_child, map, unmap, destroy functions and do unit tests to verify address space allocation
 
 ### VmAddressRegion
 ```rust
 pub struct VmAddressRegion {
-    flags: VmarFlags,
-    base: KObjectBase,
-    addr: VirtAddr,
-    size: usize,
-    parent: Option<Arc<VmAddressRegion>>,
-    page_table: Arc<Mutex<dyn PageTableTrait>>,
+    flags: VmarFlags.
+    base: KObjectBase.
+    addr: VirtAddr.
+    size: usize.
+    parent: Option<Arc<VmAddressRegion>>.
+    page_table: Arc<Mutex<dyn PageTableTrait>>.
     /// If inner is None, this region is destroyed, all operations are invalid.
-    inner: Mutex<Option<VmarInner>>,
+    inner: Mutex<Option<VmarInner>>.
 }
 
 #[derive(Default)]
 struct VmarInner {
-    children: Vec<Arc<VmAddressRegion>>,
-    mappings: Vec<Arc<VmMapping>>,
+    children: Vec<Arc<VmAddressRegion>>.
+    mappings: Vec<Arc<VmMapping>>.
 }
 ```
-构造一个根节点 VMAR，这个 VMAR 是每个进程都拥有的。
+Constructs a root VMAR that is owned by each process.
 ```rust
 impl VmAddressRegion {
     /// Create a new root VMAR.
     pub fn new_root() -> Arc<Self> {
         let (addr, size) = {
-            use core::sync::atomic::*;
-            static VMAR_ID: AtomicUsize = AtomicUsize::new(0);
-            let i = VMAR_ID.fetch_add(1, Ordering::SeqCst);
+            use core::sync::atomic::*.
+            static VMAR_ID: AtomicUsize = AtomicUsize::new(0).
+            let i = VMAR_ID.fetch_add(1, Ordering::SeqCst).
             (0x2_0000_0000 + 0x100_0000_0000 * i, 0x100_0000_0000)
-        };
+        }.
         Arc::new(VmAddressRegion {
-            flags: VmarFlags::ROOT_FLAGS,
-            base: KObjectBase::new(),
-            addr,
-            size,
-            parent: None,
+            flags: VmarFlags::ROOT_FLAGS.
+            base: KObjectBase::new().
+            addr.
+            size.
+            parent: None.
             page_table: Arc::new(Mutex::new(kernel_hal::PageTable::new())), //hal PageTable
-            inner: Mutex::new(Some(VmarInner::default())),
+            inner: Mutex::new(Some(VmarInner::default())).
         })
     }
 }
 ```
-我们的内核同样需要一个根 VMAR
+Our kernel also requires a root VMAR
 ```rust
 /// The base of kernel address space
 /// In x86 fuchsia this is 0xffff_ff80_0000_0000 instead
@@ -83,7 +83,7 @@ impl VmAddressRegion {
 }
 ```
 ### VmAddressMapping
-VmAddressMapping 用于建立 VMO 和 VMAR 之间的映射。
+VmAddressMapping is used to establish the mapping between VMO and VMAR.
 ```rust
 /// Virtual Memory Mapping
 pub struct VmMapping {
@@ -103,23 +103,23 @@ struct VmMappingInner {
     vmo_offset: usize,
 }
 ```
-map 和 unmap 实现内存映射和解映射
+map and unmap implement memory mapping and unmapping VmAddressMapping is used to establish the mapping between VMO and VMAR.
 ```rust
 impl VmMapping {
-	/// Map range and commit.
-    /// Commit pages to vmo, and map those to frames in page_table.
-    /// Temporarily used for development. A standard procedure for
-    /// vmo is: create_vmo, op_range(commit), map
+	/// Mapping scopes and commits.
+    /// Submit pages to vmo and map those pages to frames in page_table.
+    /// Temporarily used for development. one of the standard procedures for vmo is
+    /// A standard procedure for vmo is: create_vmo, op_range(commit), map
     fn map(self: &Arc<Self>) -> ZxResult {
         self.vmo.commit_pages_with(&mut |commit| {
             let inner = self.inner.lock();
             let mut page_table = self.page_table.lock();
             let page_num = inner.size / PAGE_SIZE;
             let vmo_offset = inner.vmo_offset / PAGE_SIZE;
-            for i in 0..page_num {
-                let paddr = commit(vmo_offset + i, inner.flags[i])?;
-                //通过 PageTableTrait 的 hal_pt_map 进行页表映射
-                //调用 kernel-hal的方法进行映射
+            for i in 0... .page_num {
+                let paddr = commit(vmo_offset + i, inner.flags[i]) ?
+                // page table mapping via PageTableTrait's hal_pt_map
+                // call kernel-hal's method for mapping.
             }
             Ok(())
         })
@@ -128,16 +128,16 @@ impl VmMapping {
     fn unmap(&self) {
         let inner = self.inner.lock();
         let pages = inner.size / PAGE_SIZE;
-        // TODO inner.vmo_offset unused?
-        // 调用 kernel-hal的方法进行解映射
+        // TODO inner.vmo_offset not used?
+        // Call kernel-hal's method for unmapping.
     }
 }
 ```
-## HAL：用 mmap 模拟页表
+## HAL: simulate page table with mmap
 
-> 实现页表接口 map, unmap, protect
+> Implement page table interface map, unmap, protect
 
-在 kernel-hal 中定义了一个页表和这个页表具有的方法。
+A page table and the methods this page table has are defined in kernel-hal.
 ```rust
 /// Page Table
 #[repr(C)]
@@ -212,47 +212,47 @@ impl PageTableTrait for PageTable {
     }
 }
 ```
-在 kernel-hal-unix 中实现了 PageTableTrait，在 map 中调用了 mmap。
+Implemented PageTableTrait in kernel-hal-unix, and called mmap in map.
 ```rust
-impl PageTableTrait for PageTable {
-    /// Map the page of `vaddr` to the frame of `paddr` with `flags`.
+implant PageTableTrait for PageTable {
+    /// Mapping pages from `vaddr` to `paddr` frames with `flags`.
     #[export_name = "hal_pt_map"]
     fn map(&mut self, vaddr: VirtAddr, paddr: PhysAddr, flags: MMUFlags) -> Result<()> {
-        debug_assert!(page_aligned(vaddr));
-        debug_assert!(page_aligned(paddr));
+        debug_assert! (page_aligned(vaddr));
+        debug_assert! (page_aligned(paddr));
         let prot = flags.to_mmap_prot();
         mmap(FRAME_FILE.as_raw_fd(), paddr, PAGE_SIZE, vaddr, prot);
         Ok(())
     }
 
-    /// Unmap the page of `vaddr`.
+    /// Unmapping the `vaddr` page.
     #[export_name = "hal_pt_unmap"]
     fn unmap(&mut self, vaddr: VirtAddr) -> Result<()> {
         self.unmap_cont(vaddr, 1)
     }
 }
 ```
-## 实现内存映射
+## Implementing memory mapping
 
-> 用 HAL 实现上面 VMAR 留空的部分，并做单元测试验证内存映射
+> Use hal to implement the part of vmar left empty above, and do unit tests to verify the memory mapping
 ```rust
 impl VmMapping {
-	/// Map range and commit.
-    /// Commit pages to vmo, and map those to frames in page_table.
-    /// Temporarily used for development. A standard procedure for
-    /// vmo is: create_vmo, op_range(commit), map
+	/// Mapping scope and commit.
+    /// Submit pages to vmo and map them to frames in page_table.
+    /// Temporarily used for development. one of the standard procedures for vmo is
+    /// A standard procedure for vmo is: create_vmo, op_range(commit), map
     fn map(self: &Arc<Self>) -> ZxResult {
         self.vmo.commit_pages_with(&mut |commit| {
             let inner = self.inner.lock();
             let mut page_table = self.page_table.lock();
             let page_num = inner.size / PAGE_SIZE;
             let vmo_offset = inner.vmo_offset / PAGE_SIZE;
-            for i in 0..page_num {
-                let paddr = commit(vmo_offset + i, inner.flags[i])?;
-                //通过 PageTableTrait 的 hal_pt_map 进行页表映射
+            for i in 0... .page_num {
+                let paddr = commit(vmo_offset + i, inner.flags[i]) ?
+                // page table mapping via PageTableTrait's hal_pt_map
                 page_table
                     .map(inner.addr + i * PAGE_SIZE, paddr, inner.flags[i])
-                    .expect("failed to map");
+                    .expect(" failed to map");
             }
             Ok(())
         })
@@ -261,7 +261,7 @@ impl VmMapping {
     fn unmap(&self) {
         let inner = self.inner.lock();
         let pages = inner.size / PAGE_SIZE;
-        // TODO inner.vmo_offset unused?
+        // TODO inner.vmo_offset not used?
         self.page_table
             .lock()
             .unmap_cont(inner.addr, pages)

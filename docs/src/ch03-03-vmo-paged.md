@@ -1,28 +1,28 @@
-# 物理内存：按页分配的 VMO
+# Physical memory: VMO by page allocation
 
-## 简介
+## Introduction
 
-> 说明一下：Zircon 的官方实现中为了高效支持写时复制，使用了复杂精巧的树状数据结构，但它同时也引入了复杂性和各种 Bug。
-> 我们在这里只实现一个简单版本，完整实现留给读者自行探索。
+> A note: The official implementation of Zircon uses a complex and elaborate tree data structure in order to efficiently support write-time replication, but it also introduces complexity and various bugs.
+> We only implement a simple version here, and leave the full implementation to the reader's own exploration.
 >
-> 介绍 commit 操作的意义和作用
+> Introducing the meaning and role of commit operations
 
-commit_page 和 commit_pages_with 函数的作用：用于检查物理页帧是否已经分配。
+commit_page and commit_pages_with functions are used to check if a physical page frame has been allocated.
 
-## HAL：物理内存管理
+## HAL: Physical Memory Management
 
-> 在 HAL 中实现 PhysFrame 和最简单的分配器
+> Implementation of PhysFrame and simplest allocator in HAL
 
 ### kernel-hal
 ```rust
 #[repr(C)]
 pub struct PhysFrame {
-		// paddr 物理地址
+	// paddr physical address
     paddr: PhysAddr,
 }
 
 impl PhysFrame {
-		// 分配物理页帧
+	// Allocate physical page frames
     #[linkage = "weak"]
     #[export_name = "hal_frame_alloc"]
     pub fn alloc() -> Option<Self> {
@@ -83,14 +83,15 @@ impl Drop for PhysFrame {
 }
 ```
 ### kernel-hal-unix
-通过下面的代码可以构造一个页帧号。`(PAGE_SIZE..PMEM_SIZE).step_by(PAGE_SIZE).collect()` 可以每隔 PAGE_SIZE 生成一个页帧的开始位置。
+A page frame number can be constructed with the following code. `(PAGE_SIZE..PMEM_SIZE).step_by(PAGE_SIZE).collect()` can generate the start position of a page frame every PAGE_SIZE.
 ```rust
-lazy_static! {
+lazy_static!
     static ref AVAILABLE_FRAMES: Mutex<VecDeque<usize>> =
-        Mutex::new((PAGE_SIZE..PMEM_SIZE).step_by(PAGE_SIZE).collect());
+        Mutex::new((PAGE_SIZE..PMEM_SIZE).step_by(PAGE_SIZE).collect()).
 }
 ```
-分配一块物理页帧就是从 AVAILABLE_FRAMES 中通过 pop_front 弹出一个页号
+Allocating a physical page frame is a matter of popping a page number from AVAILABLE_FRAMES via pop_front
+
 ```rust
 impl PhysFrame {
     #[export_name = "hal_frame_alloc"]
@@ -117,19 +118,20 @@ impl Drop for PhysFrame {
     }
 }
 ```
-## 辅助结构：BlockRange 迭代器
 
-> 实现 BlockRange
+## Auxiliary structures: BlockRange iterator
 
-在按页分配内存的 VMObjectPaged 的读和写的方法中会使用到一个 BlockIter 迭代器。BlockIter 主要用于将一段内存分块，每次返回这一块的信息也就是 BlockRange。
+> Implementing BlockRange
+
+A BlockIter iterator is used in the read and write methods of VMObjectPaged which allocates memory on a per-page basis. blockIter is mainly used to chunk a section of memory and return the information of this section each time, i.e. BlockRange.
 ### BlockIter
 ```rust
 #[derive(Debug, Eq, PartialEq)]
 pub struct BlockRange {
-    pub block: usize,
-    pub begin: usize, // 块内地址开始位置
-    pub end: usize, // 块内地址结束位置
-    pub block_size_log2: u8,
+    pub block: usize.
+    pub begin: usize, // start position of the address within the block
+    pub end: usize, // end position of the address within the block
+    pub block_size_log2: u8.
 }
 
 /// Given a range and iterate sub-range for each block
@@ -139,7 +141,7 @@ pub struct BlockIter {
     pub block_size_log2: u8,
 }
 ```
-block_size_log2 是 log 以2为底 block size, 比如：block size 大小为4096，则 block_size_log2 为 12。block 是块编号。
+block_size_log2 is log with a base block size of 2. For example, if the block size is 4096, then block_size_log2 is 12. block is the block number.
 ```rust
 impl BlockRange {
     pub fn len(&self) -> usize {
@@ -170,7 +172,7 @@ impl Iterator for BlockIter {
         let block_size = 1usize << self.block_size_log2;
         let block = self.begin / block_size;
         let begin = self.begin % block_size;
-		// 只有最后一块需要计算块内最后的地址，其他的直接返回块的大小
+		// Only the last block needs to calculate the last address in the block, the others return the size of the block directly
         let end = if block == self.end / block_size {
             self.end % block_size
         } else {
@@ -186,11 +188,11 @@ impl Iterator for BlockIter {
     }
 }
 ```
-## 实现按页分配的 VMO
+## Implement VMO per page allocation
 
-> 实现 for_each_page, commit, read, write 函数
+> Implement for_each_page, commit, read, write functions
 
-按页分配的 VMO 结构体如下：
+The VMO structure for per-page allocation is as follows:
 ```rust
 pub struct VMObjectPaged {
     inner: Mutex<VMObjectPagedInner>,
@@ -242,77 +244,77 @@ impl VMObjectPaged {
     }
 }
 ```
-VMObjectPaged 的读和写用到了一个非常重要的函数 for_each_page 。首先它先构造了一个 BlockIter 迭代器，然后调用传入的函数进行读或者写。
+VMObjectPaged reads and writes use a very important function for_each_page. First it constructs a BlockIter iterator, and then calls the passed-in function to read or write.
 ```rust
 impl VMObjectPagedInner {
-		/// Helper function to split range into sub-ranges within pages.
-    ///
-    /// ```text
-    /// VMO range:
-    /// |----|----|----|----|----|
-    ///
-    /// buf:
-    ///            [====len====]
+	/// Helper function to split range into sub-ranges within pages.
+    ////
+    //// ```text
+    /// VMO range.
+    /// |----|----|----|----|----|----|
+    ////
+    /// buf.
+    /// [====len====]
     /// |--offset--|
     ///
-    /// sub-ranges:
-    ///            [===]
-    ///                [====]
-    ///                     [==]
+    /// sub-ranges.
+    /// [====]
+    /// [====]
+    /// [===]
     /// ```
     ///
-    /// `f` is a function to process in-page ranges.
-    /// It takes 2 arguments:
+    //// ``f`` is a function to process in-page ranges.
+    /// It takes 2 arguments.
     /// * `paddr`: the start physical address of the in-page range.
-    /// * `buf_range`: the range in view of the input buffer.
+    //// * `buf_range`: the range in view of the input buffer.
 		fn for_each_page(
-        &mut self,
-        offset: usize,
-        buf_len: usize,
-        mut f: impl FnMut(PhysAddr, Range<usize>),
+        &mut self.
+        offset: usize.
+        buf_len: usize.
+        mut f: impl FnMut(PhysAddr, Range<usize>).
     ) {
         let iter = BlockIter {
-            begin: offset,
-            end: offset + buf_len,
-            block_size_log2: 12,
-        };
+            begin: offset.
+            end: offset + buf_len.
+            block_size_log2: 12.
+        }.
         for block in iter {
-						// 获取这一块开始的物理地址
-            let paddr = self.frames[block.block].addr();
-						// 这块物理地址的范围
-            let buf_range = block.origin_begin() - offset..block.origin_end() - offset;
-            f(paddr + block.begin, buf_range);
+						// Get the physical address where this block starts
+            let paddr = self.frames[block.block].addr().
+						// the range of the physical address of this block
+            let buf_range = block.origin_begin() - offset...block.origin_end() - offset.
+            f(paddr + block.begin, buf_range).
         }  
     }
 }
 ```
-read 和 write 函数，一个传入的是 `kernel_hal::pmem_read` ，另外一个是 `kernel_hal::pmem_write`
+read and write functions, one passed in is `kernel_hal::pmem_read` and the other is `kernel_hal::pmem_write`
 ```rust
 impl VMObjectTrait for VMObjectPaged {
     fn read(&self, offset: usize, buf: &mut [u8]) -> ZxResult {
-        let mut inner = self.inner.lock();
-        if inner.cache_policy != CachePolicy::Cached {
-            return Err(ZxError::BAD_STATE);
+        let mut inner = self.inner.lock().
+        if inner.cache_policy ! = CachePolicy::Cached {
+            return Err(ZxError::BAD_STATE).
         }
         inner.for_each_page(offset, buf.len(), |paddr, buf_range| {
-            kernel_hal::pmem_read(paddr, &mut buf[buf_range]);
-        });
+            kernel_hal::pmem_read(paddr, &mut buf[buf_range]).
+        }).
         Ok(())
     }
 
     fn write(&self, offset: usize, buf: &[u8]) -> ZxResult {
-        let mut inner = self.inner.lock();
-        if inner.cache_policy != CachePolicy::Cached {
-            return Err(ZxError::BAD_STATE);
+        let mut inner = self.inner.lock().
+        if inner.cache_policy ! = CachePolicy::Cached {
+            return Err(ZxError::BAD_STATE).
         }
         inner.for_each_page(offset, buf.len(), |paddr, buf_range| {
-            kernel_hal::pmem_write(paddr, &buf[buf_range]);
-        });
+            kernel_hal::pmem_write(paddr, &buf[buf_range]).
+        }).
         Ok(())
     }
 }
 ```
-commit 函数
+commit function
 ```rust
 impl VMObjectTrait for VMObjectPaged {
 		fn commit_page(&self, page_idx: usize, _flags: MMUFlags) -> ZxResult<PhysAddr> {
@@ -329,11 +331,11 @@ impl VMObjectTrait for VMObjectPaged {
     }
 }
 ```
-## VMO 复制
+## VMO Copy
 
-> 实现 create_child 函数
+> Implement the create_child function
 
-create_child 是将原 VMObjectPaged 的内容拷贝一份
+create_child is a copy of the original VMObjectPaged content
 ```rust
 // object/vm/vmo/paged.rs
 

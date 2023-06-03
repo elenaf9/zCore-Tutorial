@@ -1,85 +1,85 @@
-#### 对象管理器：Process 对象
+#### Object Manager: Process objects
 
-## 句柄——操作内核对象的桥梁
+## Handles - a bridge to manipulate kernel objects
 
-在1.1中我们用Rust语言实现了一个最核心的内核对象，在本小节我们将逐步了解与内核对象相关的三个重要概念中的其他两个：**句柄（Handle）和权限（Rights）**。
+In 1.1 we implemented a core kernel object in the Rust language. In this subsection we will step through the other two of the three important concepts related to kernel objects: **Handle and Rights**.
 
-句柄是允许用户程序引用内核对象引用的一种内核结构，它可以被认为是与特定内核对象的会话或连接。
+A handle is a kernel structure that allows a user program to refer to a kernel object reference, which can be thought of as a session or connection to a specific kernel object.
 
-通常情况下，多个进程通过不同的句柄同时访问同一个对象。对象可能有多个句柄（在一个或多个进程中）引用它们。但单个句柄只能绑定到单个进程或绑定到内核。
+Typically, multiple processes access the same object at the same time through different handles. Objects may have multiple handles (in one or more processes) referencing them. However, a single handle can only be bound to a single process or bound to the kernel.
 
-### 定义句柄
+### Defining handles
 
-在 object 模块下定义一个子模块：
+Define a submodule under the object module:
 
-```rust,noplaypen
+``rust,noplaypen
 // src/object/mod.rs
-mod handle;
+mod handle.
 
-pub use self::handle::*;
+pub use self::handle::*.
 ```
 
-定义句柄：
+Define handle:
 
 ```rust,noplaypen
 // src/object/handle.rs
-use super::{KernelObject, Rights};
-use alloc::sync::Arc;
+use super::{KernelObject, Rights}.
+use alloc::sync::Arc.
 
-/// 内核对象句柄
+/// Kernel object handle
 #[derive(Clone)]
 pub struct Handle {
-    pub object: Arc<dyn KernelObject>,
-    pub rights: Rights,
+    pub object: Arc<dyn KernelObject>.
+    pub rights: Rights.
 }
 ```
 
-一个Handle包含object和right两个字段，object是实现了`KernelObject`Trait的内核对象，Rights是该句柄的权限，我们将在下面提到它。
+A Handle contains two fields, object and right. object is the kernel object that implements the `KernelObject` Trait, and Rights is the rights of the handle, which we will mention below.
 
-Arc<T>是一个可以在多线程上使用的引用计数类型，这个计数会随着 `Arc<T>` 的创建或复制而增加，并当 `Arc<T>` 生命周期结束被回收时减少。当这个计数变为零之后，这个计数变量本身以及被引用的变量都会从堆上被回收。
+Arc<T> is a reference count type that can be used on multiple threads. This count increases as `Arc<T>` is created or copied, and decreases when `Arc<T>` is recycled at the end of its life cycle. After this count becomes zero, the count variable itself and the referenced variables are reclaimed from the heap.
 
-我们为什么要在这里使用Arc智能指针呢？
+Why do we use Arc smart pointers here?
 
-绝大多数内核对象的析构都发生在句柄数量为 0 时，也就是最后一个指向内核对象的Handle被关闭，该对象也随之消亡，抑或进入一种无法撤销的最终状态。很明显，这与Arc<T>天然的契合。
+The vast majority of kernel object destructions occur when the handle count is zero, when the last Handle pointing to the kernel object is closed and the object dies, or enters a final state that cannot be undone. Obviously, this is a natural fit with Arc<T>.
 
-## 控制句柄的权限——Rights
+## Permissions to control handles - Rights
 
-上文的Handle中有一个字段是rights，也就是句柄的权限。顾名思义，权限规定该句柄对引用的对象可以进行何种操作。
+One of the fields in the Handle above is rights, which is the handle's permissions. As the name implies, rights specify what operations the handle can perform on the referenced object.
 
-当不同的权限和同一个对象绑定在一起时，也就形成了不同的句柄。
+When different permissions are bound to the same object, different handles are also formed.
 
-### 定义权限
+### Defining Permissions
 
-在 object 模块下定义一个子模块：
+Define a submodule under the object module:
 
 ```rust,noplaypen
 // src/object/mod.rs
-mod rights;
+mod rights.
 
-pub use self::rights::*;
+pub use self::rights::*.
 ```
 
-权限就是u32的一个数字
+The rights are a number in u32
 
 
 ```rust,noplaypen
 // src/object/rights.rs
-use bitflags::bitflags;
+use bitflags::bitflags.
 
-bitflags! {
-    /// 句柄权限
+bitflags!
+    /// handle rights
     pub struct Rights: u32 {
-        const DUPLICATE = 1 << 0;
-        const TRANSFER = 1 << 1;
-        const READ = 1 << 2;
-        const WRITE = 1 << 3;
-        const EXECUTE = 1 << 4;
+        const DUPLICATE = 1 << 0.
+        const TRANSFER = 1 << 1.
+        const READ = 1 << 2.
+        const WRITE = 1 << 3.
+        const EXECUTE = 1 << 4.
 		...
     }
 
 ```
 
-[**bitflags**](https://docs.rs/bitflags/1.2.1/bitflags/) 是一个 Rust 中常用来比特标志位的 crate 。它提供了 一个 `bitflags!` 宏，如上面的代码段所展示的那样，借助 `bitflags!` 宏我们将一个 `u32` 的 rights 包装为一个 `Rights` 结构体。注意，在使用之前我们需要引入该 crate 的依赖：
+[**bitflags**](https://docs.rs/bitflags/1.2.1/bitflags/) is a crate commonly used for bitflags in Rust. It provides a `bitflags!` macro, and with the help of the `bitflags!` macro we wrap the rights of a `u32` into a `Rights` structure, as shown in the snippet above. Note that before we can use it, we need to introduce the dependencies of the crate:
 
 ```rust,noplaypen
 # Cargo.toml
@@ -88,150 +88,150 @@ bitflags! {
 bitflags = "1.2"
 ```
 
-定义好权限之后，我们回到句柄相关方法的实现。
+After defining the permissions, we go back to the implementation of the handle-related methods.
 
-首先是最简单的部分，创建一个handle，很显然我们需要提供两个参数，分别是句柄关联的内核对象和句柄的权限。
+The first and easiest part is to create a handle. Obviously we need to provide two parameters, the kernel object the handle is associated with and the handle's permissions.
 
 ```rust,noplaypen
 impl Handle {
-    /// 创建一个新句柄
+    /// Create a new handle
     pub fn new(object: Arc<dyn KernelObject>, rights: Rights) -> Self {
         Handle { object, rights }
     }
 }
 ```
 
-### 测试
+### Testing
 
-好啦，让我们来测试一下！
+Alright, let's test it!
 
 ```rust,noplaypen
-#[cfg(test)]
+#[cfg(test)
 mod tests {
-    use super::*;
-    use crate::object::DummyObject;
+    use super::*.
+    use crate::object::DummyObject.
     
     #[test]
     fn new_obj_handle() {
-        let obj = DummyObject::new();
-        let handle1 = Handle::new(obj.clone(), Rights::BASIC);
+        let obj = DummyObject::new().
+        let handle1 = Handle::new(obj.clone(), Rights::BASIC).
     }
 }
 ```
 
-## 句柄存储的载体——Process
+## Handle storage carrier - Process
 
-实现完了句柄之后，我们开始考虑，句柄是存储在哪里的呢？
+After implementing the handle, we start to consider, where is the handle stored?
 
-通过前面的讲解，很明显Process拥有内核对象句柄，也就是说，句柄存储在Process中，所以我们先来实现一个Process：
+From the previous explanation, it is clear that Process owns the kernel object handle, that is, the handle is stored in Process, so let's implement a Process first: ### Implement an empty process object
 
-### 实现空的process对象
+### Implement the empty process object
 
 ```rust,noplaypen
 // src/task/process.rs
-/// 进程对象
+//// Process object
 pub struct Process {
-    base: KObjectBase,
-    inner: Mutex<ProcessInner>,
+    base: KObjectBase.
+    inner: Mutex<ProcessInner>.
 }
-// 宏的作用：补充
-impl_kobject!(Process);
+// The role of the macro: add
+impl_kobject!(Process).
 
 struct ProcessInner {
-    handles: BTreeMap<HandleValue, Handle>,
+    handles: BTreeMap<HandleValue, Handle>.
 }
 
-pub type HandleValue = u32;
+pub type HandleValue = u32.
 ```
 
-handles使用BTreeMap存储的key是HandleValue，value就是句柄。通过HandleValue实现对句柄的增删操作。HandleValue实际上就是u32类型是别名。
+handles uses BTreeMap to store the key is HandleValue and the value is the handle. HandleValue is actually an alias for the u32 type.
 
-把内部对象ProcessInner用自旋锁Mutex包起来，保证了互斥访问，因为Mutex会帮我们处理好并发问题，这一点已经在1.1节中详细说明。
+Wrapping the internal object ProcessInner in a spinlock Mutex guarantees mutually exclusive access, because Mutex will help us handle concurrency, as explained in detail in section 1.1.
 
-接下来我们实现创建一个Process的方法：
+Next we implement the method that creates a Process:
 
-```rust,noplaypen
-impl Process {
-    /// 创建一个新的进程对象
+``rust,noplaypen
+process {
+    /// Create a new process object
     pub fn new() -> Arc<Self> {
         Arc::new(Process {
-            base: KObjectBase::default(),
-            inner: Mutex::new(ProcessInner {
-                handles: BTreeMap::default(),
-            }),
+            Base: KObjectBase::default(), the
+            internal: Mutex::new(ProcessInner {
+                Process: BTreeMap::default(), }
+            }).
         })
     }
 }
 ```
 
-#### 单元测试
+#### unit test
 
-我们已经实现了创建一个Process的方法，下面我们写一个单元测试：
+We have implemented the method to create a Process, and we write a unit test for the following:
 
-```rust,noplaypen
+``rust,noplaypen
 #[test]
     fn new_proc() {
         let proc = Process::new();
-        assert_eq!(proc.type_name(), "Process");
-        assert_eq!(proc.name(), "");
+        assert_eq! (proc.type_name(), "Process");
+        assert_eq! (proc.name(), "");
         proc.set_name("proc1");
-        assert_eq!(proc.name(), "proc1");
-        assert_eq!(
-            format!("{:?}", proc),
-            format!("Process({}, \"proc1\")", proc.id())
-        );
+        assert_eq! (proc.name(), "proc1");
+        assert_eq!
+            format! ("{:?}" , proc),
+            format!( "Process({}, \"proc1\")", proc.id()
+        ).
 
         let obj: Arc<dyn KernelObject> = proc;
-        assert_eq!(obj.type_name(), "Process");
-        assert_eq!(obj.name(), "proc1");
+        assert_eq! (obj.type_name(), "Process");
+        assert_eq! (obj.name(), "proc1");
         obj.set_name("proc2");
-        assert_eq!(obj.name(), "proc2");
-        assert_eq!(
-            format!("{:?}", obj),
-            format!("Process({}, \"proc2\")", obj.id())
-        );
-    }
+        assert_eq! (obj.name(), "proc2");
+        assert_eq!
+            format! ("{:?}" , obj),
+            format!( "Process({}, \"proc2\")", obj.id()
+        ).
+    
 ```
 
-### Process相关方法
+### Process-related methods
 
-#### 插入句柄
+#### Insert handle
 
-在Process中添加一个新的handle，返回值是一个handleValue，也就是u32：
+Adds a new handle to the Process, the return value is a handleValue, which is u32:.
 
-```rust,noplaypen
+``rust,noplaypen
 pub fn add_handle(&self, handle: Handle) -> HandleValue {
 
     let mut inner = self.inner.lock();
-    let value = (0 as HandleValue..)
-    	.find(|idx| !inner.handles.contains_key(idx))
+    let value = (0 as HandleValue...)
+    	.find(|idx| !inner.handle.contains_key(idx))
     	.unwrap();
-    // 插入BTreeMap
-    inner.handles.insert(value, handle);
+    // insert BTreeMap
+    inner.handle.insert(value, handle);
     value
  }
 ```
 
-#### 移除句柄
+#### Remove Handle
 
-删除Process中的一个句柄：
+Removes a handle from a process:
 
-```rust,noplaypen
+``rust,noplaypen
 pub fn remove_handle(&self, handle_value: HandleValue) {
-	self.inner.lock().handles.remove(&handle_value);
+	self.inner.lock().handle.remove(&handle_value);
 }
 ```
 
-#### 根据句柄查找内核对象
+#### Find kernel objects based on handles
 
 ```rust,noplaypen
 // src/task/process.rs
 impl Process {
-    /// 根据句柄值查找内核对象，并检查权限
+    /// Find kernel objects based on handle values and check permissions
     pub fn get_object_with_rights<T: KernelObject>(
-        &self,
-        handle_value: HandleValue,
-        desired_rights: Rights,
+        &self.
+        handle_value: HandleValue.
+        desired_rights: Rights.
     ) -> ZxResult<Arc<T>> {
         let handle = self
             .inner
@@ -239,14 +239,14 @@ impl Process {
             .handles
             .get(&handle_value)
             .ok_or(ZxError::BAD_HANDLE)?
-            .clone();
+            .clone().
         // check type before rights
         let object = handle
             .object
             .downcast_arc::<T>()
-            .map_err(|_| ZxError::WRONG_TYPE)?;
+            .map_err(|_| ZxError::WRONG_TYPE)? .
         if !handle.rights.contains(desired_rights) {
-            return Err(ZxError::ACCESS_DENIED);
+            return Err(ZxError::ACCESS_DENIED).
         }
         Ok(object)
     }
@@ -255,58 +255,58 @@ impl Process {
 
 #### ZxResult
 
-ZxResult是表示Zircon状态的i32值，值空间划分如下：
+ZxResult is the i32 value representing the state of Zircon, with the value space divided as follows:
 
 - 0:ok
-- 负值：由系统定义（也就是这个文件）
-- 正值：被保留，用于协议特定的错误值，永远不会被系统定义。
+- Negative values: defined by the system (i.e. this file)
+- Positive values: are reserved for protocol-specific error values and are never defined by the system.
 
 ```rust,noplaypen
-pub type ZxResult<T> = Result<T, ZxError>;
+pub type ZxResult<T> = Result<T, ZxError>.
 
 #[allow(non_camel_case_types, dead_code)]
 #[repr(i32)]
 #[derive(Debug, Clone, Copy)]
 pub enum ZxError {
-    OK = 0,
+    OK = 0.
    	...
    	
-    /// 一个不指向handle的特定的handle value
-    BAD_HANDLE = -11,
+    /// A specific handle value that does not point to a handle
+    BAD_HANDLE = -11.
     
-    /// 操作主体对于执行这个操作来说是错误的类型
-    /// 例如： 尝试执行 message_read 在 thread handle.
-    WRONG_TYPE = -12,
+    /// The body of the operation is of the wrong type for the execution of this operation
+    /// For example: try to execute message_read on thread handle.
+    WRONG_TYPE = -12.
     
-    // 权限检查错误
-    // 调用者没有执行该操作的权限
-    ACCESS_DENIED = -30,
+    // Permission check error
+    // The caller does not have permission to execute the operation
+    ACCESS_DENIED = -30.
 }
 ```
 
-ZxResult<T>相当于Result<T, ZxError>，也就相当于我们自己定义了一种错误。
+ZxResult<T> is equivalent to Result<T, ZxError>, which is equivalent to defining our own kind of error.
 
-### 单元测试
+### Unit testing
 
-目前为止，我们已经实现了Process最基础的方法，下面我们来运行一个单元测试：
+So far, we have implemented the most basic methods of Process, so let's run a unit test:
 
 ```rust,noplaypen
 fn proc_handle() {
-        let proc = Process::new();
-        let handle = Handle::new(proc.clone(), Rights::DEFAULT_PROCESS);
-        let handle_value = proc.add_handle(handle);
+        let proc = Process::new().
+        let handle = Handle::new(proc.clone(), Rights::DEFAULT_PROCESS).
+        let handle_value = proc.add_handle(handle).
 
         let object1: Arc<Process> = proc
             .get_object_with_rights(handle_value, Rights::DEFAULT_PROCESS)
-            .expect("failed to get object");
-        assert!(Arc::ptr_eq(&object1, &proc));
+            .expect("failed to get object").
+        assert!(Arc::ptr_eq(&object1, &proc)).
 
-        proc.remove_handle(handle_value);
+        proc.remove_handle(handle_value).
     }
 ```
 
-## 总结
+## Summary
 
-在这一节中我们实现了内核对象的两个重要的概念，句柄（Handle）和权限（Rights），同时实现了句柄存储的载体——Process，并且实现了Process的基本方法，这将是我们继续探索zCore的基础。
+In this section we have implemented two important concepts of kernel objects, Handle and Rights, as well as Process, the carrier of handle storage, and implemented the basic methods of Process, which will be the basis for our continued exploration of zCore.
 
-在下一节中，我们将介绍内核对象的传输器——管道（Channel）。
+In the next section, we will introduce Channel, the transporter of kernel objects.

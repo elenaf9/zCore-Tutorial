@@ -1,42 +1,42 @@
-# zCore 整体结构和设计模式
+# zCore overall structure and design patterns
 
-首先，从 [Rust语言操作系统的设计与实现,王润基本科毕设论文,2019](https://github.com/rcore-os/zCore/wiki/files/wrj-thesis.pdf) 和 [zCore操作系统内核的设计与实现,潘庆霖本科毕设论文,2020](https://github.com/rcore-os/zCore/wiki/files/pql-thesis.pdf) 可以了解到从 rCore 的设计到 zCore 的设计过程的全貌。
+First of all, from [Design and Implementation of Rust Language Operating System,Wang Runji B.S. Thesis,2019](https://github.com/rcore-os/zCore/wiki/files/wrj-thesis.pdf) and [Design and Implementation of zCore OS Kernel,Pan Qinglin B.S. Thesis. 2020](https://github.com/rcore-os/zCore/wiki/files/pql-thesis.pdf), we can get a full picture of the design process from the design of rCore to the design of zCore.
 
-## zCore 的整体结构
+## The overall structure of zCore
 
-[zCore](https://github.com/rcore-os/zCore) 的整体结构/项目设计图如下：
+The overall structure/project design diagram of [zCore](https://github.com/rcore-os/zCore) is as follows:
 
-![img](zcore-intro/structure.svg)
+! [img](zcore-intro/structure.svg)
 
-zCore的设计主要有两个出发点：
+The design of zCore has two main starting points:
 
-- 内核对象的封装：将内核对象代码封装为一个库，保证可重用
-- 硬件接口的设计：使硬件与内核对象的设计相对独立，只向上提供统一、抽象的API接口
+- Encapsulation of kernel objects: encapsulating the kernel object code into a library to ensure reusability
+- Hardware interface design: make the design of hardware and kernel objects relatively independent, and only provide a unified, abstract API interface upwards
 
-项目设计从上到下，上层更远离硬件，下层更接近硬件。
+The project is designed from top to bottom, with the top layer further away from the hardware and the bottom layer closer to the hardware.
 
-zCore 设计的顶层是上层操作系统，比如 zCore、rCore、Zircon LibOS 和 Linux LibOS。在项目架构中，各版本的操作系统有部分公用代码。与 zCore 微内核设计实现相关的部分则主要是图中左侧蓝色线部分。
+The top layer of the zCore design is the upper operating system, such as zCore, rCore, Zircon LibOS, and Linux LibOS, and there is some common code for each version of the operating system in the project architecture. The part related to the zCore microkernel design implementation is mainly the blue line on the left side of the figure.
 
-第二层，是 ELF 程序加载层（ELF Program Loader），包括 zircon-loader 和 linux-loader，其中封装了初始化内核对象、部分硬件相关的初始化、设定系统调用接口、运行首个用户态程序等逻辑，并形成一个库函数。zCore 在顶层通过调用 zircon-loader 库中的初始化逻辑，进入第一个用户态程序执行。
+The second layer, the ELF Program Loader, consists of the zircon-loader and the linux-loader, which encapsulates the logic for initializing kernel objects, initializing some hardware, setting up the system call interface, running the first user-state program, etc., and forming a library function. zCore is implemented at the top level by calling the zCore enters the first user-state program execution by calling the initialization logic in the zircon-loader library.
 
-第三层，是系统调用实现层（Syscall Implementation），包括 zircon-syscall 和 linux-syscall，这一层将所有的系统调用处理例程封装为一个系统调用库，供上方操作系统使用。
+The third layer, the Syscall Implementation layer, includes zircon-syscall and linux-syscall. This layer encapsulates all system call processing routines into a library of system calls for use by the operating system above.
 
-第四层，利用硬件抽象层提供的虚拟硬件 API 进行内核对象（Kernel Objects）的实现，并且基于实现的各类内核对象，实现第三层各个系统调用接口所需要的具体处理例程。
+The fourth layer implements Kernel Objects using the virtual hardware APIs provided by the hardware abstraction layer, and implements the specific processing routines needed for each system call interface in the third layer based on the various Kernel Objects implemented.
 
-第五层，是硬件抽象层（HAL，Hardware Abstraction Layer），这里对应的是 kernel-hal 模块。kernel-hal 将向上提供所有操作硬件需要的接口，从而使得硬件环境对上层操作系统透明化。
+The fifth layer is the Hardware Abstraction Layer (HAL), which corresponds to the kernel-hal module. kernel-hal provides all the interfaces needed to operate the hardware upwards, thus making the hardware environment transparent to the upper operating system.
 
-第六层，是对直接操作硬件的代码进行一层封装，对应模块为 kernel-hal-bare 和 kernel-hal-unix。kernel-hal 系列库仅仅负责接口定义，即将底层硬件/宿主操作系统的操作翻译为上层操作系统可以使用的形式。在这里，kernel-hal-bare 负责翻译裸机的硬件功能，而 kernel-hal-unix 则负责翻译类 Unix 系统的系统调用。
+The sixth layer is a layer of encapsulation of the code for direct hardware manipulation, corresponding to the kernel-hal-bare and kernel-hal-unix modules. kernel-hal family of libraries is only responsible for the interface definition, i.e. translating the underlying hardware/host OS operations into a form that can be used by the upper OS. In this case, kernel-hal-bare is responsible for translating bare metal hardware functions, while kernel-hal-unix is responsible for translating system calls for Unix-like systems.
 
-最底层是底层运行环境，包括 Bare Metal（裸机），Linux / macOS 操作系统。Bare Metal可以认为是硬件架构上的寄存器等硬件接口。
+At the bottom is the underlying runtime environment, which includes Bare Metal (bare metal), Linux / macOS operating systems. bare metal can be thought of as hardware interfaces such as registers on the hardware architecture.
 
-## zCore 内核组件
+## zCore kernel components
 
-zCore 内核运行时组件层次概况如下：
+The zCore kernel runtime component hierarchy is outlined as follows:
 
-![image-20200805123801306](zcore-intro/image-20200805123801306.png)
+! [image-20200805123801306](zcore-intro/image-20200805123801306.png)
 
-在zCore启动过程中，会初始化物理页帧分配器、堆分配器、线程调度器等各个组成部分。并委托 zircon-­loader 进行内核对象的初始化创建过程，然后进入用户态的启动过程开始执行。每当用户态触发系统调用进入内核态，系统调用处理例程将会通过已实现的内核对象的功能来对服务请求进行处理；而对应的内核对象的内部实现所需要的各种底层操作，则是通过 HAL 层接口由各个内核组件负责提供。
+During zCore startup, various components such as physical page frame allocator, heap allocator, thread scheduler, etc. are initialized. The zircon-loader is entrusted with the initialization of the kernel objects, and then the user-state boot process begins. Whenever the user state triggers a system call into the kernel state, the system call processing routine will process the service request through the implemented kernel object; the underlying operations required for the internal implementation of the corresponding kernel object are provided by the kernel components through the HAL layer interface.
 
-其中，VDSO（Virtual dynamic shared object）是一个映射到用户空间的 so 文件，可以在不陷入内核的情况下执行一些简单的系统调用。在设计中，所有中断都需要经过 VDSO 拦截进行处理，因此重写 VDSO 便可以实现自定义的对下层系统调用（syscall）的支持。Executor 是 zCore 中基于 Rust 的 `async` 机制的协程调度器。
+Among them, VDSO (Virtual dynamic shared object) is a so file mapped to user space that can execute some simple system calls without getting caught in the kernel. Executor is a Rust-based `async` mechanism in zCore for the concurrent scheduler.
 
-在HAL接口层的设计上，还借助了 Rust 的能够指定函数链接过程的特性。即，在 kernel-­hal 中规定了所有可供 zircon­-object 库及 zircon-­syscall 库调用的虚拟硬件接口，以函数 API 的形式给出，但是内部均为未实现状态，并设置函数为弱引用链接状态。在 kernel­-hal-­bare 中才给出裸机环境下的硬件接口具体实现，编译 zCore 项目时、链接的过程中将会替换/覆盖 kernel-­hal 中未实现的同名接口，从而达到能够在编译时灵活选择 HAL 层的效果。
+The HAL interface layer is also designed to take advantage of Rust's ability to specify function linking procedures. That is, all virtual hardware interfaces that can be called by the zircon-object and zircon-syscall libraries are specified in kernel-hal as function APIs, but are internally unimplemented and set to a weakly referenced linking state. The concrete implementation of the hardware interfaces in the bare-metal environment is given in kernel-hal-bare, and the unimplemented interfaces of the same name in kernel-hal will be replaced/overwritten during the linking process when the zCore project is compiled, so that the HAL layer can be flexibly selected during compilation.

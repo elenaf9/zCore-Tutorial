@@ -1,12 +1,12 @@
-# 上下文切换
+# Context switching
 
-> 本节介绍 trapframe-rs 中 [fncall.rs] 的魔法实现
+> This section describes the magic implementation of [fncall.rs] in trapframe-rs
 
 [fncall.rs]: https://github.com/rcore-os/trapframe-rs/blob/master/src/arch/x86_64/fncall.rs
 
-## 保存和恢复通用寄存器
+# # Save and restore general purpose registers
 
-> 定义 UserContext 结构体
+> Define the UserContext structure
 
 ```rust
 pub struct UserContext {
@@ -39,10 +39,10 @@ pub struct GeneralRegs {
     pub gsbase: usize,
 }
 ```
-`Usercontext`保存了用户执行的上下文，包括跳转到用户态之后程序的第一条指令的地址，如果程序首次从内核态进入用户态执行，则rip指向用户进程的第一条指令的地址。
-> 保存 callee-saved 寄存器到栈上，恢复 UserContext 寄存器，进入用户态，反之亦然
+`Usercontext` holds the context of user execution, including the address of the first instruction of the program after jumping to the user state, or the address of the first instruction of the rip pointing to the user process if the program first enters the user state from the kernel state for execution.
+> save the callee-saved register to the stack, restore the UserContext register, and enter the user state, and vice versa
 ```rust
-syscall_fn_return:
+syscall_fn_return.
     # save callee-saved registers
     push r15
     push r14
@@ -65,7 +65,7 @@ syscall_fn_return:
     pop rsi
     pop rdi
     pop rbp
-    pop r8                  # skip rsp
+    pop r8 # skip rsp
     pop r8
     pop r9
     pop r10
@@ -74,26 +74,25 @@ syscall_fn_return:
     pop r13
     pop r14
     pop r15
-    pop r11                 # r11 = rip. FIXME: don't overwrite r11!
-    popfq                   # pop rflags
-    mov rsp, [rsp - 8*11]   # restore rsp
-    jmp r11                 # restore rip
+    pop r11 # r11 = rip. fixme: don't overwrite r11!
+    popfq # pop rflags
+    mov rsp, [rsp - 8*11] # restore rsp
+    jmp r11 # restore rip
 ```
-弹出的寄存器恰好对应了GeneralRegs的结构，通过在rust的unsafe代码块中调用`syscall_fn_return`函数，并且传递`Usercontext`结构体的指针到rdi中，可以创造出程序进入用户态的运行环境。
+The popped registers correspond exactly to the structure of GeneralRegs. By calling the `syscall_fn_return` function in the unsafe code block of rust and passing a pointer to the `Usercontext` structure to rdi, you can create a runtime environment for the program to enter the user state.
 
 
-## 找回内核上下文：线程局部存储 与 FS 寄存器
+## Finding the kernel context: thread-local storage and FS registers
 
-> 在用户程序跳转回内核代码的那一刻，如何在不破坏用户寄存器的情况下切换回内核栈？
+> How to switch back to the kernel stack without destroying the user registers at the moment the user program jumps back to the kernel code?
 >
-> 进入用户态前，将内核栈指针保存在内核 glibc 的 TLS 区域中。为此我们需要查看 glibc 源码，找到一个空闲位置。
+> Before entering the user state, the kernel stack pointer is stored in the TLS area of the kernel glibc. To do this we need to look at the glibc source code and find a free location.
 >
-> Linux 和 macOS 下如何分别通过系统调用设置 fsbase / gsbase
+> How to set fsbase / gsbase via system calls on Linux and macOS respectively
 
-## 测试
+## Testing
 
-> 编写单元测试验证上述过程
-
+> Write unit tests to verify the above procedure
 ```rust
 #[cfg(test)]
 mod tests {
@@ -228,9 +227,8 @@ dump_registers:
     }
 }
 ```
+## Trouble with macOS: Dynamic Binary Modification
 
-## macOS 的麻烦：动态二进制修改
-
-> 由于 macOS 用户程序无法修改 fs 寄存器，当运行相关指令时会访问非法内存地址触发段错误。
+> Since macOS user programs cannot modify the fs register, running the relevant instruction will access an illegal memory address and trigger a segment error.
 > 
-> 我们需要实现段错误信号处理函数，并在其中动态修改用户程序指令，将 fs 改为 gs。
+> We need to implement a segment error signal handling function and dynamically modify the user program instruction in it to change fs to gs.

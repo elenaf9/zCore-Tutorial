@@ -1,1 +1,1 @@
-# Fuchsia OS 和 Zircon 微内核
+# Fuchsia OS and Zircon microkernel
